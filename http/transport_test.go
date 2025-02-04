@@ -8,9 +8,9 @@ import (
 )
 
 func TestBytes(t *testing.T) {
-   tr := Transport{DisableCompression: true}
-   tr.ProxyFromEnvironment()
-   tr.DefaultClient()
+   port := Transport{DisableCompression: true}
+   port.ProxyFromEnvironment()
+   port.DefaultClient()
    req := http.Request{URL: &url.URL{
       Scheme: "http",
       Host: "httpbingo.org",
