@@ -3,6 +3,7 @@ package http
 import (
    "io"
    "net/http"
+   "net/url"
    "testing"
 )
 
@@ -24,5 +25,27 @@ func TestParts(t *testing.T) {
          }
       }()
       progress.Next()
+   }
+}
+
+func TestBytes(t *testing.T) {
+   http.DefaultTransport = &http.Transport{DisableCompression: true}
+   http.DefaultClient.Transport = Transport{}
+   req := http.Request{URL: &url.URL{
+      Scheme: "http",
+      Host: "httpbingo.org",
+      Path: "/drip",
+      RawQuery: "delay=0&duration=9",
+   }}
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {   
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   var progress ProgressBytes
+   progress.Set(resp)
+   _, err = io.Copy(io.Discard, &progress)
+   if err != nil {   
+      t.Fatal(err)
    }
 }

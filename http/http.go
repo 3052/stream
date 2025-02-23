@@ -7,6 +7,16 @@ import (
    "time"
 )
 
+type Transport struct{}
+
+func (Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+   if req.Method == "" {
+      req.Method = "GET"
+   }
+   log.Println(req.Method, req.URL)
+   return http.DefaultTransport.RoundTrip(req)
+}
+
 // firefox does this
 // 29s left - 19.9 of 33.5 MB (540 KB/sec)
 func log_progress(d time.Duration) {
