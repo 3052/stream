@@ -8,21 +8,21 @@ import (
 )
 
 func Test(t *testing.T) {
-   req, err := http.NewRequest("", "http://httpbingo.org/get", nil)
+   resp, err := http.Get("http://httpbingo.org/get")
    if err != nil {
       t.Fatal(err)
    }
-   err = write(req)
+   err = Write("http", resp)
    if err != nil {
       t.Fatal(err)
    }
-   resp, err := read()
+   resp1, err := Read("http")
    if err != nil {
       t.Fatal(err)
    }
-   err = resp.Write(os.Stdout)
+   err = resp1.Write(os.Stdout)
    if err != nil {
       t.Fatal(err)
    }
-   fmt.Printf("%#v\n", resp.Request.URL)
+   fmt.Printf("%#v\n", resp1.Request.URL)
 }
