@@ -1,0 +1,49 @@
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Date: Mon, 24 Feb 2025 03:35:37 GMT
+Fly-Request-Id: 01JMV0CJSWS32ZMNZGFNYSSE81-dfw
+Server: Fly/fd243e55f (2025-02-20)
+Via: 1.1 fly.io
+
+234
+{
+  "args": {},
+  "headers": {
+    "Accept-Encoding": [
+      "gzip"
+    ],
+    "Host": [
+      "httpbingo.org"
+    ],
+    "User-Agent": [
+      "Go-http-client/1.1"
+    ],
+    "Via": [
+      "1.1 fly.io"
+    ],
+    "X-Forwarded-For": [
+      "72.181.16.91, 66.241.125.232"
+    ],
+    "X-Forwarded-Port": [
+      "80"
+    ],
+    "X-Forwarded-Proto": [
+      "http"
+    ],
+    "X-Forwarded-Ssl": [
+      "off"
+    ],
+    "X-Request-Start": [
+      "t=1740368137020290"
+    ]
+  },
+  "method": "GET",
+  "origin": "72.181.16.91",
+  "url": "http://httpbingo.org/get"
+}
+
+0
+
