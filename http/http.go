@@ -11,36 +11,27 @@ import (
    "time"
 )
 
-func Write(name string, resp *http.Response) error {
+func Create(name string, resp *http.Response) error {
    log.Println("Create", name)
    file, err := os.Create(name)
    if err != nil {
       return err
    }
    defer file.Close()
-   data, err := resp.Request.URL.MarshalBinary()
-   if err != nil {
-      return err
-   }
-   _, err = file.Write(data)
-   if err != nil {
-      return err
-   }
-   _, err = file.Write([]byte{0})
-   if err != nil {
-      return err
-   }
-   return resp.Write(file)
+   return Write(file, resp)
 }
 
-func Read(name string) (*http.Response, error) {
+func Open(name string) (*http.Response, error) {
    file, err := os.Open(name)
    if err != nil {
       return nil, err
    }
    defer file.Close()
-   buf := bufio.NewReader(file)
-   data, err := buf.ReadSlice(0)
+   return Read(bufio.NewReader(file))
+}
+
+func Read(r *bufio.Reader) (*http.Response, error) {
+   data, err := r.ReadSlice(0)
    if err != nil {
       return nil, err
    }
@@ -50,7 +41,23 @@ func Read(name string) (*http.Response, error) {
    if err != nil {
       return nil, err
    }
-   return http.ReadResponse(buf, &http.Request{URL: &u})
+   return http.ReadResponse(r, &http.Request{URL: &u})
+}
+
+func Write(w io.Writer, resp *http.Response) error {
+   data, err := resp.Request.URL.MarshalBinary()
+   if err != nil {
+      return err
+   }
+   _, err = w.Write(data)
+   if err != nil {
+      return err
+   }
+   _, err = w.Write([]byte{0})
+   if err != nil {
+      return err
+   }
+   return resp.Write(w)
 }
 
 // firefox does this

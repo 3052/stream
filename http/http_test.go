@@ -14,11 +14,11 @@ func TestWriteRead(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = Write("http.txt", resp)
+   err = Create("http.txt", resp)
    if err != nil {
       t.Fatal(err)
    }
-   resp1, err := Read("http.txt")
+   resp1, err := Open("http.txt")
    if err != nil {
       t.Fatal(err)
    }
