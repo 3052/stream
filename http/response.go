@@ -1,8 +1,8 @@
 package http
 
 import (
-   "bufio"
    "bytes"
+   "fmt"
    "io"
    "log"
    "net/http"
@@ -10,53 +10,45 @@ import (
    "os"
 )
 
-func Read(r io.Reader) (*http.Response, error) {
-   buf := bufio.NewReader(r)
-   data, err := buf.ReadSlice(0)
-   if err != nil {
-      return nil, err
-   }
-   data = bytes.TrimSuffix(data, []byte{0})
-   var u url.URL
-   err = u.UnmarshalBinary(data)
-   if err != nil {
-      return nil, err
-   }
-   return http.ReadResponse(buf, &http.Request{URL: &u})
+type Response struct {
+   Url *url.URL
+   Body []byte
 }
 
-// we cannot use os.Open because the full file is not read until the response
-// body is read
-func ReadFile(name string) (*http.Response, error) {
+func (r *Response) New(resp *http.Response) error {
+   var err error
+   r.Body, err = io.ReadAll(resp.Body)
+   if err != nil {
+      return err
+   }
+   r.Url = resp.Request.URL
+   return nil
+}
+
+func (r *Response) Read(name string) error {
    data, err := os.ReadFile(name)
    if err != nil {
-      return nil, err
+      return err
    }
-   return Read(bytes.NewReader(data))
+   data, r.Body, _ = bytes.Cut(data, []byte{'\n'})
+   r.Url = &url.URL{}
+   return r.Url.UnmarshalBinary(data)
 }
 
-func Write(w io.Writer, resp *http.Response) error {
-   data, err := resp.Request.URL.MarshalBinary()
-   if err != nil {
-      return err
-   }
-   _, err = w.Write(data)
-   if err != nil {
-      return err
-   }
-   _, err = w.Write([]byte{0})
-   if err != nil {
-      return err
-   }
-   return resp.Write(w)
-}
-
-func WriteFile(name string, resp *http.Response) error {
+func (r *Response) Write(name string) error {
    log.Println("Create", name)
    file, err := os.Create(name)
    if err != nil {
       return err
    }
    defer file.Close()
-   return Write(file, resp)
+   _, err = fmt.Fprintln(file, r.Url)
+   if err != nil {
+      return err
+   }
+   _, err = file.Write(r.Body)
+   if err != nil {
+      return err
+   }
+   return nil
 }
