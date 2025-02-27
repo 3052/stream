@@ -16,6 +16,7 @@ type Response struct {
 }
 
 func (r *Response) New(resp *http.Response) error {
+   defer resp.Body.Close()
    var err error
    r.Body, err = io.ReadAll(resp.Body)
    if err != nil {
