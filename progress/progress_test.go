@@ -1,4 +1,4 @@
-package http
+package progress
 
 import (
    "io"
@@ -10,7 +10,7 @@ import (
 func TestParts(t *testing.T) {
    var (
       parts [9]struct{}
-      progress ProgressParts
+      progress Parts
    )
    progress.Set(len(parts))
    for range parts {
@@ -30,7 +30,7 @@ func TestParts(t *testing.T) {
 }
 
 func TestBytes(t *testing.T) {
-   http.DefaultTransport = &http.Transport{DisableCompression: true}
+   http.DefaultClient.Transport = &http.Transport{DisableCompression: true}
    req := http.Request{URL: &url.URL{
       Scheme: "http",
       Host: "httpbingo.org",
@@ -42,7 +42,7 @@ func TestBytes(t *testing.T) {
       t.Fatal(err)
    }
    defer resp.Body.Close()
-   var progress ProgressBytes
+   var progress Bytes
    progress.Set(resp)
    _, err = io.Copy(io.Discard, &progress)
    if err != nil {   
