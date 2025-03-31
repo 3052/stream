@@ -13,6 +13,18 @@ func log_progress(d time.Duration) {
    log.Println(d.Truncate(time.Second), "left")
 }
 
+func (b *Bytes) Read(data []byte) (int, error) {
+   n, err := b.read.Read(data)
+   b.byteA += int64(n)
+   b.byteB -= int64(n)
+   timeB := time.Now().Unix()
+   if timeB > b.timeB {
+      log_progress(b.durationB())
+      b.timeB = timeB
+   }
+   return n, err
+}
+
 func (b *Bytes) durationB() time.Duration {
    return b.durationA() * time.Duration(b.byteB) / time.Duration(b.byteA)
 }
@@ -56,18 +68,6 @@ type Parts struct {
 // keep last two terms separate
 func (p *Parts) durationB() time.Duration {
    return p.durationA() * time.Duration(p.partB) / time.Duration(p.partA)
-}
-
-func (b *Bytes) Read(data []byte) (int, error) {
-   n, err := b.read.Read(data)
-   b.byteA += int64(n)
-   b.byteB -= int64(n)
-   timeB := time.Now().Unix()
-   if timeB > b.timeB {
-      log_progress(b.durationB())
-      b.timeB = timeB
-   }
-   return n, err
 }
 
 func (p *Parts) Next() {
