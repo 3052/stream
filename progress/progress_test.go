@@ -2,26 +2,28 @@ package progress
 
 import (
    "io"
+   "log"
    "net/http"
    "net/url"
    "testing"
 )
 
-func TestParts(t *testing.T) {
+func TestSegment(t *testing.T) {
+   log.SetFlags(log.Ltime)
    var (
-      parts [9]struct{}
-      progress Parts
+      segment    [9]struct{}
+      progress Segment
    )
-   progress.Set(len(parts))
-   for range parts {
+   progress.Set(len(segment))
+   for range segment {
       func() {
          resp, err := http.Get("http://httpbingo.org/drip?delay=0&duration=1")
-         if err != nil {   
+         if err != nil {
             t.Fatal(err)
          }
          defer resp.Body.Close()
          _, err = io.Copy(io.Discard, resp.Body)
-         if err != nil {   
+         if err != nil {
             t.Fatal(err)
          }
       }()
@@ -29,23 +31,23 @@ func TestParts(t *testing.T) {
    }
 }
 
-func TestBytes(t *testing.T) {
+func TestByte(t *testing.T) {
    http.DefaultClient.Transport = &http.Transport{DisableCompression: true}
    req := http.Request{URL: &url.URL{
-      Scheme: "http",
-      Host: "httpbingo.org",
-      Path: "/drip",
+      Scheme:   "http",
+      Host:     "httpbingo.org",
+      Path:     "/drip",
       RawQuery: "delay=0&duration=9",
    }}
    resp, err := http.DefaultClient.Do(&req)
-   if err != nil {   
+   if err != nil {
       t.Fatal(err)
    }
    defer resp.Body.Close()
-   var progress Bytes
+   var progress Byte
    progress.Set(resp)
    _, err = io.Copy(io.Discard, &progress)
-   if err != nil {   
+   if err != nil {
       t.Fatal(err)
    }
 }
