@@ -72,8 +72,6 @@ type Segment struct {
    timeB    int64
 }
 
-///
-
 func (s *Segment) durationA() time.Duration {
    return time.Since(s.timeA)
 }
