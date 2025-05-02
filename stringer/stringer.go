@@ -4,6 +4,8 @@ import "strconv"
 
 type Cardinal float64
 
+type Percent float64
+
 type Rate float64
 
 type unit_measure struct {
@@ -12,8 +14,6 @@ type unit_measure struct {
 }
 
 ///
-
-type Percent float64
 
 type Size float64
 
