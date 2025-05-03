@@ -8,14 +8,14 @@ type Percent float64
 
 type Rate float64
 
+type Size float64
+
 type unit_measure struct {
    factor float64
    name string
 }
 
 ///
-
-type Size float64
 
 func label(value float64, unit *unit_measure) string {
    var prec int
