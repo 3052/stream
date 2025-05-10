@@ -2,6 +2,15 @@ package stringer
 
 import "strconv"
 
+func label(value float64, unit *unit_measure) string {
+   var prec int
+   if unit.factor != 1 {
+      prec = 2
+      value *= unit.factor
+   }
+   return strconv.FormatFloat(value, 'f', prec, 64) + unit.name
+}
+
 type Cardinal float64
 
 type Percent float64
@@ -16,15 +25,6 @@ type unit_measure struct {
 }
 
 ///
-
-func label(value float64, unit *unit_measure) string {
-   var prec int
-   if unit.factor != 1 {
-      prec = 2
-      value *= unit.factor
-   }
-   return strconv.FormatFloat(value, 'f', prec, 64) + unit.name
-}
 
 func scale(value float64, units []unit_measure) string {
    var unit unit_measure
