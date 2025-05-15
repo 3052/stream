@@ -11,7 +11,7 @@ func Test(t *testing.T) {
    log.SetFlags(log.Ltime)
    var (
       segment    [9]struct{}
-      progress1 Progress
+      progress1 progress
    )
    progress1.Set(len(segment))
    for range segment {
