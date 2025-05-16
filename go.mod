@@ -1,4 +1,4 @@
-module 41.neocities.org/stream
+module 41.neocities.org/net
 
 go 1.24.0
 

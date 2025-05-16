@@ -1,4 +1,4 @@
-package stream
+package net
 
 import (
    "41.neocities.org/dash"

@@ -1,5 +1,5 @@
-# x
+# net
 
-this repository holds supplementary Go packages
+interface for network I/O
 
-https://pkg.go.dev/golang.org/x
+https://41.neocities.org/net
