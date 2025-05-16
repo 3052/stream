@@ -1,6 +1,7 @@
-package dash
+package stream
 
 import (
+   "41.neocities.org/dash"
    "fmt"
    "io"
    "log"
@@ -8,13 +9,20 @@ import (
    "testing"
 )
 
+func TestExpect(t *testing.T) {
+   const expect = 3_300_000
+   actual := expected(representations, expect)
+   fmt.Printf("%+v %v\n", actual, tolerance(&actual, expect, 0.4))
+   fmt.Printf("%+v %v\n", actual, tolerance(&actual, expect, 0.1))
+}
+
 func TestProgress(t *testing.T) {
    log.SetFlags(log.Ltime)
    var (
       segment    [9]struct{}
       progress1 progress
    )
-   progress1.Set(len(segment))
+   progress1.set(len(segment))
    for range segment {
       func() {
          resp, err := http.Get("http://httpbingo.org/drip?delay=0&duration=1")
@@ -27,49 +35,17 @@ func TestProgress(t *testing.T) {
             t.Fatal(err)
          }
       }()
-      progress1.Next()
+      progress1.next()
    }
 }
 
-func TestExpect(t *testing.T) {
-   const expect = 3_300_000
-   var actual representation
-   actual.expect(representations, expect)
-   fmt.Printf("%+v %v\n", actual, actual.tolerance(expect, 0.4))
-   fmt.Printf("%+v %v\n", actual, actual.tolerance(expect, 0.1))
-}
-
-var representations = []representation{
-   {
-      bandwidth: 5_096_445,
-      codecs:    "avc1.640028",
-   },
-   {
-      bandwidth: 2_748_690,
-      codecs:    "avc1.64001f",
-   },
-   {
-      bandwidth: 1_867_586,
-      codecs:    "avc1.64001f",
-   },
-   {
-      bandwidth: 1278765,
-      codecs:    "avc1.64001f",
-   },
-   {
-      bandwidth: 772927,
-      codecs:    "avc1.64001f",
-   },
-   {
-      bandwidth: 402389,
-      codecs:    "avc1.64001f",
-   },
-   {
-      bandwidth: 102803,
-      codecs:    "mp4a.40.2",
-   },
-   {
-      bandwidth: 1216,
-      codecs:    "wvtt",
-   },
+var representations = []dash.Representation{
+   { Bandwidth: 5_096_445 },
+   { Bandwidth: 2_748_690 },
+   { Bandwidth: 1_867_586 },
+   { Bandwidth: 1278765 },
+   { Bandwidth: 772927 },
+   { Bandwidth: 402389 },
+   { Bandwidth: 102803 },
+   { Bandwidth: 1216 },
 }
