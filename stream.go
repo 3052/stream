@@ -91,6 +91,20 @@ func get(u *url.URL, head http.Header) ([]byte, error) {
    return io.ReadAll(resp.Body)
 }
 
+func dash_create(represent *dash.Representation) (*os.File, error) {
+   switch *represent.MimeType {
+   case "audio/mp4":
+      return create(".m4a")
+   case "text/vtt":
+      return create(".vtt")
+   case "video/mp4":
+      return create(".m4v")
+   }
+   return nil, errors.New(*represent.MimeType)
+}
+
+///
+
 func marshal(resp *http.Response) ([]byte, error) {
    var buf bytes.Buffer
    _, err := fmt.Fprintln(&buf, resp.Request.URL)
@@ -114,18 +128,6 @@ func unmarshal(data []byte) (*http.Response, error) {
    return http.ReadResponse(
       bufio.NewReader(bytes.NewReader(data)), &http.Request{URL: &base},
    )
-}
-
-func dash_create(represent *dash.Representation) (*os.File, error) {
-   switch *represent.MimeType {
-   case "audio/mp4":
-      return create(".m4a")
-   case "text/vtt":
-      return create(".vtt")
-   case "video/mp4":
-      return create(".m4v")
-   }
-   return nil, errors.New(*represent.MimeType)
 }
 
 func init() {
