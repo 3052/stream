@@ -7,9 +7,10 @@ import (
 
 func Test(t *testing.T) {
    const expect = 3_300_000
-   value1 := value(representations, expect)
-   fmt.Printf("%+v %v\n", value1, value1.tolerance(expect, 0.4))
-   fmt.Printf("%+v %v\n", value1, value1.tolerance(expect, 0.1))
+   var actual representation
+   actual.expect(representations, expect)
+   fmt.Printf("%+v %v\n", actual, actual.tolerance(expect, 0.4))
+   fmt.Printf("%+v %v\n", actual, actual.tolerance(expect, 0.1))
 }
 
 var representations = []representation{
