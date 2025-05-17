@@ -20,6 +20,19 @@ import (
    "time"
 )
 
+func init() {
+   log.SetFlags(log.Ltime)
+   http.DefaultClient.Transport = &transport{
+      // x/net/http2: make Transport return nicer error when Amazon ALB hangs up
+      // mid-response?
+      // github.com/golang/go/issues/18639
+      // x/net/http2: Transport ignores net/http.Transport.Proxy once connected
+      // github.com/golang/go/issues/25793
+      Protocols: &http.Protocols{},
+      Proxy:     http.ProxyFromEnvironment,
+   }
+}
+
 func write_file(name string, data []byte) error {
    err := os.MkdirAll(path.Dir(name), os.ModePerm)
    if err != nil {
@@ -65,6 +78,7 @@ func Mpd(name string, resp *http.Response) error {
    }
    return nil
 }
+
 var ThreadCount = 1
 
 const (
@@ -131,19 +145,6 @@ func unmarshal(data []byte) (*http.Response, error) {
    )
 }
 
-func init() {
-   log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = &transport{
-      // x/net/http2: make Transport return nicer error when Amazon ALB hangs up
-      // mid-response?
-      // github.com/golang/go/issues/18639
-      // x/net/http2: Transport ignores net/http.Transport.Proxy once connected
-      // github.com/golang/go/issues/25793
-      Protocols: &http.Protocols{},
-      Proxy:     http.ProxyFromEnvironment,
-   }
-}
-
 func (m *media_file) New(represent *dash.Representation) error {
    for _, content := range represent.ContentProtection {
       if content.SchemeIdUri == widevine_urn {
@@ -168,6 +169,7 @@ func (m *media_file) New(represent *dash.Representation) error {
    }
    return nil
 }
+
 type media_file struct {
    key_id    []byte // tenc
    pssh      []byte // pssh
