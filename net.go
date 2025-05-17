@@ -14,20 +14,27 @@ import (
    "net/http"
    "net/url"
    "os"
+   "path"
    "slices"
    "strings"
    "time"
 )
 
-var ThreadCount = 1
+func write_file(name string, data []byte) error {
+   err := os.MkdirAll(path.Dir(name), os.ModePerm)
+   if err != nil {
+      return err
+   }
+   log.Println("WriteFile", name)
+   return os.WriteFile(name, data, os.ModePerm)
+}
 
 func Mpd(name string, resp *http.Response) error {
    data, err := marshal(resp)
    if err != nil {
       return err
    }
-   log.Println("WriteFile", name)
-   err = os.WriteFile(name, data, os.ModePerm)
+   err = write_file(name, data)
    if err != nil {
       return err
    }
@@ -58,16 +65,12 @@ func Mpd(name string, resp *http.Response) error {
    }
    return nil
 }
+var ThreadCount = 1
 
 const (
    widevine_system_id = "edef8ba979d64acea3c827dcd51d21ed"
    widevine_urn       = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
 )
-
-func create(name string) (*os.File, error) {
-   log.Println("Create", name)
-   return os.Create(name)
-}
 
 func get(u *url.URL, head http.Header) ([]byte, error) {
    req := http.Request{Method: "GET", URL: u}
@@ -102,8 +105,6 @@ func dash_create(represent *dash.Representation) (*os.File, error) {
    }
    return nil, errors.New(*represent.MimeType)
 }
-
-///
 
 func marshal(resp *http.Response) ([]byte, error) {
    var buf bytes.Buffer
@@ -314,4 +315,9 @@ func expected(values []dash.Representation, expect int) dash.Representation {
 // github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
 func tolerance(value *dash.Representation, expect int, percent float64) bool {
    return float64(variation(value, expect)) <= float64(expect)*percent
+}
+
+func create(name string) (*os.File, error) {
+   log.Println("Create", name)
+   return os.Create(name)
 }
