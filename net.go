@@ -5,7 +5,6 @@ import (
    "41.neocities.org/sofia/file"
    "41.neocities.org/sofia/pssh"
    "41.neocities.org/widevine"
-   "bufio"
    "bytes"
    "encoding/base64"
    "errors"
@@ -20,93 +19,6 @@ import (
    "strings"
    "time"
 )
-
-func (e *License) Download(name, id string) error {
-   data, err := os.ReadFile(name)
-   if err != nil {
-      return err
-   }
-   resp, err := unmarshal(data)
-   if err != nil {
-      return err
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      return err
-   }
-   var mpd1 dash.Mpd
-   err = mpd1.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   mpd1.Set(resp.Request.URL)
-   for represent := range mpd1.Representation() {
-      if represent.Id == id {
-         if represent.SegmentBase != nil {
-            return e.segment_base(&represent)
-         }
-         if represent.SegmentList != nil {
-            return e.segment_list(&represent)
-         }
-         return e.segment_template(&represent)
-      }
-   }
-   return nil
-}
-
-func (e *License) get_key(media *media_file) ([]byte, error) {
-   if media.key_id == nil {
-      return nil, nil
-   }
-   private_key, err := os.ReadFile(e.PrivateKey)
-   if err != nil {
-      return nil, err
-   }
-   client_id, err := os.ReadFile(e.ClientId)
-   if err != nil {
-      return nil, err
-   }
-   if media.pssh == nil {
-      var pssh1 widevine.Pssh
-      pssh1.KeyIds = [][]byte{media.key_id}
-      media.pssh = pssh1.Marshal()
-   }
-   log.Println("PSSH", base64.StdEncoding.EncodeToString(media.pssh))
-   var module widevine.Cdm
-   err = module.New(private_key, client_id, media.pssh)
-   if err != nil {
-      return nil, err
-   }
-   data, err := module.RequestBody()
-   if err != nil {
-      return nil, err
-   }
-   data, err = e.Widevine(data)
-   if err != nil {
-      return nil, err
-   }
-   var body widevine.ResponseBody
-   err = body.Unmarshal(data)
-   if err != nil {
-      return nil, err
-   }
-   block, err := module.Block(body)
-   if err != nil {
-      return nil, err
-   }
-   for container := range body.Container() {
-      if bytes.Equal(container.Id(), media.key_id) {
-         key := container.Key(block)
-         log.Println("key", base64.StdEncoding.EncodeToString(key))
-         var zero [16]byte
-         if !bytes.Equal(key, zero[:]) {
-            return key, nil
-         }
-      }
-   }
-   return nil, errors.New("get_key")
-}
 
 func Mpd(name string, resp *http.Response) error {
    data, err := marshal(resp)
@@ -171,31 +83,6 @@ func dash_create(represent *dash.Representation) (*os.File, error) {
       return create(".m4v")
    }
    return nil, errors.New(*represent.MimeType)
-}
-
-func marshal(resp *http.Response) ([]byte, error) {
-   var buf bytes.Buffer
-   _, err := fmt.Fprintln(&buf, resp.Request.URL)
-   if err != nil {
-      return nil, err
-   }
-   err = resp.Write(&buf)
-   if err != nil {
-      return nil, err
-   }
-   return buf.Bytes(), nil
-}
-
-func unmarshal(data []byte) (*http.Response, error) {
-   data1, data, _ := bytes.Cut(data, []byte{'\n'})
-   var base url.URL
-   err := base.UnmarshalBinary(data1)
-   if err != nil {
-      return nil, err
-   }
-   return http.ReadResponse(
-      bufio.NewReader(bytes.NewReader(data)), &http.Request{URL: &base},
-   )
 }
 
 func (m *media_file) New(represent *dash.Representation) error {
@@ -339,29 +226,6 @@ func (p *progress) durationA() time.Duration {
 // keep last two terms separate
 func (p *progress) durationB() time.Duration {
    return p.durationA() * time.Duration(p.segmentB) / time.Duration(p.segmentA)
-}
-
-func variation(value *dash.Representation, expect int) int {
-   variation := value.Bandwidth - expect
-   if variation < 0 {
-      return -variation
-   }
-   return variation
-}
-
-func expected(values []dash.Representation, expect int) dash.Representation {
-   a := values[0]
-   for _, b := range values[1:] {
-      if variation(&b, expect) < variation(&a, expect) {
-         a = b
-      }
-   }
-   return a
-}
-
-// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
-func tolerance(value *dash.Representation, expect int, percent float64) bool {
-   return float64(variation(value, expect)) <= float64(expect)*percent
 }
 
 func create(name string) (*os.File, error) {
@@ -614,4 +478,91 @@ func get_segment(u *url.URL, head http.Header) ([]byte, error) {
       return nil, errors.New(data.String())
    }
    return io.ReadAll(resp.Body)
+}
+func (e *License) Download(name, id string) error {
+   data, err := os.ReadFile(name)
+   if err != nil {
+      return err
+   }
+   var resp response
+   err = resp.unmarshal(data)
+   if err != nil {
+      return err
+   }
+   defer resp[0].Body.Close()
+   data, err = io.ReadAll(resp[0].Body)
+   if err != nil {
+      return err
+   }
+   var mpd1 dash.Mpd
+   err = mpd1.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd1.Set(resp[0].Request.URL)
+   for represent := range mpd1.Representation() {
+      if represent.Id == id {
+         if represent.SegmentBase != nil {
+            return e.segment_base(&represent)
+         }
+         if represent.SegmentList != nil {
+            return e.segment_list(&represent)
+         }
+         return e.segment_template(&represent)
+      }
+   }
+   return nil
+}
+
+func (e *License) get_key(media *media_file) ([]byte, error) {
+   if media.key_id == nil {
+      return nil, nil
+   }
+   private_key, err := os.ReadFile(e.PrivateKey)
+   if err != nil {
+      return nil, err
+   }
+   client_id, err := os.ReadFile(e.ClientId)
+   if err != nil {
+      return nil, err
+   }
+   if media.pssh == nil {
+      var pssh1 widevine.Pssh
+      pssh1.KeyIds = [][]byte{media.key_id}
+      media.pssh = pssh1.Marshal()
+   }
+   log.Println("PSSH", base64.StdEncoding.EncodeToString(media.pssh))
+   var module widevine.Cdm
+   err = module.New(private_key, client_id, media.pssh)
+   if err != nil {
+      return nil, err
+   }
+   data, err := module.RequestBody()
+   if err != nil {
+      return nil, err
+   }
+   data, err = e.Widevine(data)
+   if err != nil {
+      return nil, err
+   }
+   var body widevine.ResponseBody
+   err = body.Unmarshal(data)
+   if err != nil {
+      return nil, err
+   }
+   block, err := module.Block(body)
+   if err != nil {
+      return nil, err
+   }
+   for container := range body.Container() {
+      if bytes.Equal(container.Id(), media.key_id) {
+         key := container.Key(block)
+         log.Println("key", base64.StdEncoding.EncodeToString(key))
+         var zero [16]byte
+         if !bytes.Equal(key, zero[:]) {
+            return key, nil
+         }
+      }
+   }
+   return nil, errors.New("get_key")
 }
