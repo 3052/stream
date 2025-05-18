@@ -10,7 +10,7 @@ import (
 func TestProgress(t *testing.T) {
    log.SetFlags(log.Ltime)
    var (
-      segment    [9]struct{}
+      segment   [9]struct{}
       progress1 progress
    )
    progress1.set(len(segment))

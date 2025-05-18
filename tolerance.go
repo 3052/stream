@@ -8,9 +8,31 @@ import (
    "net/http"
 )
 
+type Bandwidth struct {
+   Value []int64
+   Ok    bool
+}
+
+func (b *Bandwidth) Set(data string) error {
+   var value int64
+   _, err := fmt.Sscan(data, &value)
+   if err != nil {
+      return err
+   }
+   if b.Ok {
+      b.Value = append(b.Value, value)
+   } else {
+      b.Value = []int64{value}
+      b.Ok = true
+   }
+   return nil
+}
+
 // github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
 // wikipedia.org/wiki/Engineering_tolerance
-func tolerance(actual *dash.Representation, correct []int64, limit float64) bool {
+func tolerance(
+   actual *dash.Representation, correct []int64, limit float64,
+) bool {
    for _, correct1 := range correct {
       variation := actual.Bandwidth - correct1
       if variation < 0 {
@@ -27,7 +49,7 @@ func (e *License) Tolerance(
    resp *http.Response, correct []int64, limit float64,
 ) error {
    for _, correct1 := range correct {
-      variation := float64(correct1)*limit
+      variation := float64(correct1) * limit
       log.Println(
          "tolerance", correct1-int64(variation), correct1+int64(variation),
       )

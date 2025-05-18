@@ -233,7 +233,7 @@ func (e *License) segment_template(represent *dash.Representation) error {
    for chunk := range slices.Chunk(segments, ThreadCount) {
       var (
          datas = make([][]byte, len(chunk))
-         errs = make(chan error)
+         errs  = make(chan error)
       )
       for i, segment := range chunk {
          address, err := represent.SegmentTemplate.Media.Url(represent, segment)
@@ -320,7 +320,7 @@ func (e *License) segment_base(represent *dash.Representation) error {
    for _, reference := range file2.Sidx.Reference {
       index[0] = index[1] + 1
       index[1] += uint64(reference.Size())
-      head.Set("range", "bytes="+ index.String())
+      head.Set("range", "bytes="+index.String())
       data, err = get_segment(represent.BaseUrl[0], head)
       if err != nil {
          return err
