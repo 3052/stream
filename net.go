@@ -18,6 +18,8 @@ import (
    "time"
 )
 
+var Threads = 1
+
 func create(represent *dash.Representation) (*os.File, error) {
    var name strings.Builder
    name.WriteString(represent.Id)
@@ -34,8 +36,6 @@ func os_create(name string) (*os.File, error) {
    log.Println("Create", name)
    return os.Create(name)
 }
-
-var ThreadCount = 1
 
 const (
    widevine_system_id = "edef8ba979d64acea3c827dcd51d21ed"
@@ -230,10 +230,10 @@ func (e *License) segment_template(represent *dash.Representation) error {
    }
    var progress1 progress
    progress1.set(len(segments))
-   for chunk := range slices.Chunk(segments, ThreadCount) {
+   for chunk := range slices.Chunk(segments, Threads) {
       var (
          datas = make([][]byte, len(chunk))
-         errs = make(chan error)
+         errs  = make(chan error)
       )
       for i, segment := range chunk {
          address, err := represent.SegmentTemplate.Media.Url(represent, segment)
@@ -267,8 +267,8 @@ func (e *License) segment_template(represent *dash.Representation) error {
 }
 
 func (e *License) segment_base(represent *dash.Representation) error {
-   if ThreadCount != 1 {
-      return errors.New("ThreadCount")
+   if Threads != 1 {
+      return errors.New("Threads")
    }
    var media media_file
    err := media.New(represent)
@@ -320,7 +320,7 @@ func (e *License) segment_base(represent *dash.Representation) error {
    for _, reference := range file2.Sidx.Reference {
       index[0] = index[1] + 1
       index[1] += uint64(reference.Size())
-      head.Set("range", "bytes="+ index.String())
+      head.Set("range", "bytes="+index.String())
       data, err = get_segment(represent.BaseUrl[0], head)
       if err != nil {
          return err
@@ -339,8 +339,8 @@ func (e *License) segment_base(represent *dash.Representation) error {
 }
 
 func (e *License) segment_list(represent *dash.Representation) error {
-   if ThreadCount != 1 {
-      return errors.New("ThreadCount")
+   if Threads != 1 {
+      return errors.New("Threads")
    }
    var media media_file
    err := media.New(represent)
