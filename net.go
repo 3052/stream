@@ -20,43 +20,6 @@ import (
    "time"
 )
 
-func Mpd(name string, resp *http.Response) error {
-   data, err := marshal(resp)
-   if err != nil {
-      return err
-   }
-   err = write_file(name, data)
-   if err != nil {
-      return err
-   }
-   resp, err = unmarshal(data)
-   if err != nil {
-      return err
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      return err
-   }
-   var mpd1 dash.Mpd
-   err = mpd1.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   represents := slices.SortedFunc(mpd1.Representation(),
-      func(a, b dash.Representation) int {
-         return a.Bandwidth - b.Bandwidth
-      },
-   )
-   for i, represent := range represents {
-      if i >= 1 {
-         fmt.Println()
-      }
-      fmt.Println(&represent)
-   }
-   return nil
-}
-
 func write_file(name string, data []byte) error {
    err := os.MkdirAll(path.Dir(name), os.ModePerm)
    if err != nil {
@@ -273,8 +236,8 @@ func (e *License) segment_template(represent *dash.Representation) error {
       return err
    }
    var segments []int
-   for r := range represent.Representation() {
-      segments = slices.AppendSeq(segments, r.Segment())
+   for represent1 := range represent.Representation() {
+      segments = slices.AppendSeq(segments, represent1.Segment())
    }
    var progress1 progress
    progress1.set(len(segments))
@@ -479,40 +442,6 @@ func get_segment(u *url.URL, head http.Header) ([]byte, error) {
    }
    return io.ReadAll(resp.Body)
 }
-func (e *License) Download(name, id string) error {
-   data, err := os.ReadFile(name)
-   if err != nil {
-      return err
-   }
-   var resp response
-   err = resp.unmarshal(data)
-   if err != nil {
-      return err
-   }
-   defer resp[0].Body.Close()
-   data, err = io.ReadAll(resp[0].Body)
-   if err != nil {
-      return err
-   }
-   var mpd1 dash.Mpd
-   err = mpd1.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   mpd1.Set(resp[0].Request.URL)
-   for represent := range mpd1.Representation() {
-      if represent.Id == id {
-         if represent.SegmentBase != nil {
-            return e.segment_base(&represent)
-         }
-         if represent.SegmentList != nil {
-            return e.segment_list(&represent)
-         }
-         return e.segment_template(&represent)
-      }
-   }
-   return nil
-}
 
 func (e *License) get_key(media *media_file) ([]byte, error) {
    if media.key_id == nil {
@@ -565,4 +494,78 @@ func (e *License) get_key(media *media_file) ([]byte, error) {
       }
    }
    return nil, errors.New("get_key")
+}
+
+///
+
+func (r Response) Mpd(name string) error {
+   data, err := r.marshal()
+   if err != nil {
+      return err
+   }
+   err = write_file(name, data)
+   if err != nil {
+      return err
+   }
+   err = r.unmarshal(data)
+   if err != nil {
+      return err
+   }
+   defer r[0].Body.Close()
+   data, err = io.ReadAll(r[0].Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   represents := slices.SortedFunc(mpd.Representation(),
+      func(a, b dash.Representation) int {
+         return a.Bandwidth - b.Bandwidth
+      },
+   )
+   for i, represent := range represents {
+      if i >= 1 {
+         fmt.Println()
+      }
+      fmt.Println(&represent)
+   }
+   return nil
+}
+
+func (e *License) Download(name, id string) error {
+   data, err := os.ReadFile(name)
+   if err != nil {
+      return err
+   }
+   var resp Response
+   err = resp.unmarshal(data)
+   if err != nil {
+      return err
+   }
+   defer resp[0].Body.Close()
+   data, err = io.ReadAll(resp[0].Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd.Set(resp[0].Request.URL)
+   for represent := range mpd.Representation() {
+      if represent.Id == id {
+         if represent.SegmentBase != nil {
+            return e.segment_base(&represent)
+         }
+         if represent.SegmentList != nil {
+            return e.segment_list(&represent)
+         }
+         return e.segment_template(&represent)
+      }
+   }
+   return nil
 }

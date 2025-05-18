@@ -9,7 +9,31 @@ import (
    "net/url"
 )
 
-func (r response) marshal() ([]byte, error) {
+type representation [1]dash.Representation
+
+func (a *representation) expect(actual []representation, expect int) {
+   *a = actual[0]
+   for _, b := range actual[1:] {
+      if b.variation(expect) < a.variation(expect) {
+         *a = b
+      }
+   }
+}
+
+func (r *representation) variation(expect int) int {
+   variation := r[0].Bandwidth - expect
+   if variation < 0 {
+      return -variation
+   }
+   return variation
+}
+
+// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
+func (r *representation) tolerance(expect int, percent float64) bool {
+   return float64(r.variation(expect)) <= float64(expect)*percent
+}
+
+func (r Response) marshal() ([]byte, error) {
    var buf bytes.Buffer
    _, err := fmt.Fprintln(&buf, r[0].Request.URL)
    if err != nil {
@@ -22,9 +46,9 @@ func (r response) marshal() ([]byte, error) {
    return buf.Bytes(), nil
 }
 
-type response [1]*http.Response
+type Response [1]*http.Response
 
-func (r *response) unmarshal(data []byte) error {
+func (r *Response) unmarshal(data []byte) error {
    before, data, _ := bytes.Cut(data, []byte{'\n'})
    var base url.URL
    err := base.UnmarshalBinary(before)
@@ -38,27 +62,4 @@ func (r *response) unmarshal(data []byte) error {
       return err
    }
    return nil
-}
-
-func variation(value *dash.Representation, expect int) int {
-   variation := value.Bandwidth - expect
-   if variation < 0 {
-      return -variation
-   }
-   return variation
-}
-
-func expected(values []dash.Representation, expect int) dash.Representation {
-   a := values[0]
-   for _, b := range values[1:] {
-      if variation(&b, expect) < variation(&a, expect) {
-         a = b
-      }
-   }
-   return a
-}
-
-// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
-func tolerance(value *dash.Representation, expect int, percent float64) bool {
-   return float64(variation(value, expect)) <= float64(expect)*percent
 }

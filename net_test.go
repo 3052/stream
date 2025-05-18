@@ -1,8 +1,6 @@
 package net
 
 import (
-   "41.neocities.org/dash"
-   "fmt"
    "io"
    "log"
    "net/http"
