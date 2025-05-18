@@ -6,11 +6,10 @@ import (
    "testing"
 )
 
-func TestExpect(t *testing.T) {
-   const expect = 3_300_000
-   actual := expected(representations, expect)
-   fmt.Printf("%+v %v\n", actual, tolerance(&actual, expect, 0.4))
-   fmt.Printf("%+v %v\n", actual, tolerance(&actual, expect, 0.1))
+func TestTolerance(t *testing.T) {
+   for _, actual := range representations {
+      fmt.Println(actual.Bandwidth, tolerance(&actual, 3_300_000, 0.4))
+   }
 }
 
 var representations = []dash.Representation{
