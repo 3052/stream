@@ -5,60 +5,34 @@ import (
    "41.neocities.org/sofia/file"
    "41.neocities.org/sofia/pssh"
    "41.neocities.org/widevine"
-   "bufio"
    "bytes"
    "encoding/base64"
    "errors"
-   "fmt"
    "io"
    "log"
    "net/http"
    "net/url"
    "os"
-   "path"
    "slices"
    "strings"
    "time"
 )
 
-func (r Response) marshal() ([]byte, error) {
-   var buf bytes.Buffer
-   _, err := fmt.Fprintln(&buf, r[0].Request.URL)
-   if err != nil {
-      return nil, err
+func create(represent *dash.Representation) (*os.File, error) {
+   var name strings.Builder
+   name.WriteString(represent.Id)
+   switch *represent.MimeType {
+   case "audio/mp4":
+      name.WriteString(".m4a")
+   case "video/mp4":
+      name.WriteString(".m4v")
    }
-   err = r[0].Write(&buf)
-   if err != nil {
-      return nil, err
-   }
-   return buf.Bytes(), nil
+   return os_create(name.String())
 }
 
-type Response [1]*http.Response
-
-func (r *Response) unmarshal(data []byte) error {
-   before, data, _ := bytes.Cut(data, []byte{'\n'})
-   var base url.URL
-   err := base.UnmarshalBinary(before)
-   if err != nil {
-      return err
-   }
-   r[0], err = http.ReadResponse(
-      bufio.NewReader(bytes.NewReader(data)), &http.Request{URL: &base},
-   )
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-func write_file(name string, data []byte) error {
-   err := os.MkdirAll(path.Dir(name), os.ModePerm)
-   if err != nil {
-      return err
-   }
-   log.Println("WriteFile", name)
-   return os.WriteFile(name, data, os.ModePerm)
+func os_create(name string) (*os.File, error) {
+   log.Println("Create", name)
+   return os.Create(name)
 }
 
 var ThreadCount = 1
@@ -67,18 +41,6 @@ const (
    widevine_system_id = "edef8ba979d64acea3c827dcd51d21ed"
    widevine_urn       = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
 )
-
-func dash_create(represent *dash.Representation) (*os.File, error) {
-   switch *represent.MimeType {
-   case "audio/mp4":
-      return create(".m4a")
-   case "text/vtt":
-      return create(".vtt")
-   case "video/mp4":
-      return create(".m4v")
-   }
-   return nil, errors.New(*represent.MimeType)
-}
 
 func (m *media_file) New(represent *dash.Representation) error {
    for _, content := range represent.ContentProtection {
@@ -223,11 +185,6 @@ func (p *progress) durationB() time.Duration {
    return p.durationA() * time.Duration(p.segmentB) / time.Duration(p.segmentA)
 }
 
-func create(name string) (*os.File, error) {
-   log.Println("Create", name)
-   return os.Create(name)
-}
-
 type License struct {
    ClientId   string
    PrivateKey string
@@ -240,7 +197,7 @@ func (e *License) segment_template(represent *dash.Representation) error {
    if err != nil {
       return err
    }
-   file1, err := dash_create(represent)
+   file1, err := create(represent)
    if err != nil {
       return err
    }
@@ -318,7 +275,7 @@ func (e *License) segment_base(represent *dash.Representation) error {
    if err != nil {
       return err
    }
-   file1, err := dash_create(represent)
+   file1, err := create(represent)
    if err != nil {
       return err
    }
@@ -390,7 +347,7 @@ func (e *License) segment_list(represent *dash.Representation) error {
    if err != nil {
       return err
    }
-   file1, err := dash_create(represent)
+   file1, err := create(represent)
    if err != nil {
       return err
    }
