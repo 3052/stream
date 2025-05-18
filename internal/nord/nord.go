@@ -15,6 +15,51 @@ import (
    "time"
 )
 
+func main() {
+   log.SetFlags(log.Ltime)
+   http.DefaultClient.Transport = transport{}
+   write := flag.Bool("w", false, "write")
+   country_code := flag.String("c", "", "country code")
+   flag.Parse()
+   name, err := os.UserHomeDir()
+   if err != nil {
+      panic(err)
+   }
+   name = filepath.ToSlash(name) + "/net/nord/ServerLoads"
+   switch {
+   case *country_code != "":
+      err := do_country(name, *country_code)
+      if err != nil {
+         panic(err)
+      }
+   case *write:
+      err := do_write(name)
+      if err != nil {
+         panic(err)
+      }
+   default:
+      flag.Usage()
+   }
+}
+
+func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
+   log.Println(req.Method, req.URL)
+   return http.DefaultTransport.RoundTrip(req)
+}
+
+type transport struct{}
+
+func do_write(name string) error {
+   servers, err := nord.GetServers(0)
+   if err != nil {
+      return err
+   }
+   data, err := nord.GetServerLoads(servers).Marshal()
+   if err != nil {
+      return err
+   }
+   return write_file(name, data)
+}
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
@@ -67,50 +112,4 @@ func read_file(name string) ([]byte, error) {
       return nil, errors.New("ModTime")
    }
    return io.ReadAll(file)
-}
-
-func main() {
-   log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = transport{}
-   write := flag.Bool("w", false, "write")
-   country_code := flag.String("c", "", "country code")
-   flag.Parse()
-   name, err := os.UserHomeDir()
-   if err != nil {
-      panic(err)
-   }
-   name = filepath.ToSlash(name) + "/platform/nord/ServerLoads"
-   switch {
-   case *country_code != "":
-      err := do_country(name, *country_code)
-      if err != nil {
-         panic(err)
-      }
-   case *write:
-      err := do_write(name)
-      if err != nil {
-         panic(err)
-      }
-   default:
-      flag.Usage()
-   }
-}
-
-func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
-   log.Println(req.Method, req.URL)
-   return http.DefaultTransport.RoundTrip(req)
-}
-
-type transport struct{}
-
-func do_write(name string) error {
-   servers, err := nord.GetServers(0)
-   if err != nil {
-      return err
-   }
-   data, err := nord.GetServerLoads(servers).Marshal()
-   if err != nil {
-      return err
-   }
-   return write_file(name, data)
 }
