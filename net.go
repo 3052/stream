@@ -18,19 +18,21 @@ import (
    "time"
 )
 
-var Threads = 1
-
 func create(represent *dash.Representation) (*os.File, error) {
    var name strings.Builder
    name.WriteString(represent.Id)
    switch *represent.MimeType {
    case "audio/mp4":
       name.WriteString(".m4a")
+   case "image/jpeg":
+      name.WriteString(".jpg")
    case "video/mp4":
       name.WriteString(".m4v")
    }
    return os_create(name.String())
 }
+
+var Threads = 1
 
 func os_create(name string) (*os.File, error) {
    log.Println("Create", name)

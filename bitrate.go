@@ -5,7 +5,58 @@ import (
    "fmt"
    "io"
    "net/http"
+   "slices"
 )
+
+func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
+   defer resp.Body.Close()
+   data, err := io.ReadAll(resp.Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd.Set(resp.Request.URL)
+   represents := slices.SortedFunc(mpd.Representation(),
+      func(a, b *dash.Representation) int {
+         return a.Bandwidth - b.Bandwidth
+      },
+   )
+   for i, represent := range represents {
+      if i >= 1 {
+         fmt.Println()
+      }
+      fmt.Println(represent)
+      if correct.contains(represent.Bandwidth) {
+         switch {
+         case represent.SegmentBase != nil:
+            err = e.segment_base(represent)
+         case represent.SegmentList != nil:
+            err = e.segment_list(represent)
+         case represent.SegmentTemplate != nil:
+            err = e.segment_template(represent)
+         }
+         if err != nil {
+            return err
+         }
+      }
+   }
+   return nil
+}
+
+func (b *Bitrate) String() string {
+   var data []byte
+   for _, value := range b.Value {
+      if data != nil {
+         data = append(data, ", "...)
+      }
+      data = fmt.Appendf(data, "%v-%v", value[0], value[1])
+   }
+   return string(data)
+}
 
 // github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
 func (b *Bitrate) contains(actual int) bool {
@@ -34,55 +85,7 @@ func (b *Bitrate) Set(data string) error {
    return nil
 }
 
-func (b *Bitrate) String() string {
-   var data []byte
-   for i, value := range b.Value {
-      if i >= 1 {
-         data = append(data, ", "...)
-      }
-      data = fmt.Appendf(data, "%v-%v", value[0], value[1])
-   }
-   return string(data)
-}
-
 type Bitrate struct {
    Value [][2]int
    Ok    bool
-}
-
-func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
-   defer resp.Body.Close()
-   data, err := io.ReadAll(resp.Body)
-   if err != nil {
-      return err
-   }
-   var mpd dash.Mpd
-   err = mpd.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   mpd.Set(resp.Request.URL)
-   var line bool
-   for represent := range mpd.Representation() {
-      if line {
-         fmt.Println()
-      } else {
-         line = true
-      }
-      fmt.Println(represent)
-      if correct.contains(represent.Bandwidth) {
-         switch {
-         case represent.SegmentBase != nil:
-            err = e.segment_base(represent)
-         case represent.SegmentList != nil:
-            err = e.segment_list(represent)
-         case represent.SegmentTemplate != nil:
-            err = e.segment_template(represent)
-         }
-         if err != nil {
-            return err
-         }
-      }
-   }
-   return nil
 }
