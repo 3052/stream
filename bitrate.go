@@ -4,56 +4,53 @@ import (
    "41.neocities.org/dash"
    "fmt"
    "io"
-   "log"
    "net/http"
 )
 
-type Bandwidth struct {
-   Value []int64
-   Ok    bool
+// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
+func (b *Bitrate) contains(actual int) bool {
+   for _, correct := range b.Value {
+      if actual >= correct[0] {
+         if actual <= correct[1] {
+            return true
+         }
+      }
+   }
+   return false
 }
 
-func (b *Bandwidth) Set(data string) error {
-   var value int64
-   _, err := fmt.Sscan(data, &value)
+func (b *Bitrate) Set(data string) error {
+   var value [2]int
+   _, err := fmt.Sscanf(data, "%v-%v", &value[0], &value[1])
    if err != nil {
       return err
    }
    if b.Ok {
       b.Value = append(b.Value, value)
    } else {
-      b.Value = []int64{value}
+      b.Value = [][2]int{value}
       b.Ok = true
    }
    return nil
 }
 
-// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
-// wikipedia.org/wiki/Engineering_tolerance
-func tolerance(
-   actual *dash.Representation, correct []int64, limit float64,
-) bool {
-   for _, correct1 := range correct {
-      variation := actual.Bandwidth - correct1
-      if variation < 0 {
-         variation = -variation
+func (b *Bitrate) String() string {
+   var data []byte
+   for i, value := range b.Value {
+      if i >= 1 {
+         data = append(data, ", "...)
       }
-      if float64(variation) <= float64(correct1)*limit {
-         return true
-      }
+      data = fmt.Appendf(data, "%v-%v", value[0], value[1])
    }
-   return false
+   return string(data)
 }
 
-func (e *License) Tolerance(
-   resp *http.Response, correct []int64, limit float64,
-) error {
-   for _, correct1 := range correct {
-      variation := float64(correct1) * limit
-      log.Println(
-         "tolerance", correct1-int64(variation), correct1+int64(variation),
-      )
-   }
+type Bitrate struct {
+   Value [][2]int
+   Ok    bool
+}
+
+func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
    defer resp.Body.Close()
    data, err := io.ReadAll(resp.Body)
    if err != nil {
@@ -73,7 +70,7 @@ func (e *License) Tolerance(
          line = true
       }
       fmt.Println(represent)
-      if tolerance(represent, correct, limit) {
+      if correct.contains(represent.Bandwidth) {
          switch {
          case represent.SegmentBase != nil:
             err = e.segment_base(represent)

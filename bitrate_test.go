@@ -3,7 +3,6 @@ package net
 import (
    "41.neocities.org/dash"
    "fmt"
-   "log"
    "testing"
 )
 
@@ -18,17 +17,11 @@ var representations = []dash.Representation{
    {Bandwidth: 1216},
 }
 
-func TestTolerance(t *testing.T) {
-   correct := []int64{3_000_000, 100_000}
-   for _, correct1 := range correct {
-      variation := float64(correct1) * 0.1
-      log.Println(
-         "tolerance", correct1-int64(variation), correct1+int64(variation),
-      )
+func TestBitrate(t *testing.T) {
+   correct := Bitrate{
+      Value: [][2]int{{2_000_000, 3_000_000}},
    }
    for _, actual := range representations {
-      fmt.Println(
-         actual.Bandwidth, tolerance(&actual, correct, 0.3),
-      )
+      fmt.Println(actual.Bandwidth, correct.contains(actual.Bandwidth))
    }
 }
