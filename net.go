@@ -18,6 +18,26 @@ import (
    "time"
 )
 
+// LOG
+// PROXY
+type Transport struct{}
+
+func (Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+   log.Println(req.Method, req.URL)
+   return http.DefaultTransport.RoundTrip(req)
+}
+
+func init() {
+   log.SetFlags(log.Ltime)
+   http.DefaultClient.Transport = Transport{}
+}
+
+// NO LOG
+// NO PROXY
+var Client = http.Client{
+   Transport: &http.Transport{},
+}
+
 func create(represent *dash.Representation) (*os.File, error) {
    var name strings.Builder
    name.WriteString(represent.Id)
@@ -390,26 +410,6 @@ func (e *License) segment_list(represent *dash.Representation) error {
       }
    }
    return nil
-}
-
-func init() {
-   log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = transport{}
-}
-
-// LOG
-// PROXY
-type transport struct{}
-
-func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
-   log.Println(req.Method, req.URL)
-   return http.DefaultTransport.RoundTrip(req)
-}
-
-// NO LOG
-// NO PROXY
-var Client = http.Client{
-   Transport: &http.Transport{},
 }
 
 func get_segment(u *url.URL, head http.Header) ([]byte, error) {
