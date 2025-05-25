@@ -8,34 +8,96 @@ import (
    "bytes"
    "encoding/base64"
    "errors"
+   "fmt"
    "io"
    "log"
    "net/http"
-   "net/url"
    "os"
    "slices"
    "strings"
    "time"
 )
 
-// LOG
-// PROXY
-type Transport struct{}
-
-func (Transport) RoundTrip(req *http.Request) (*http.Response, error) {
-   log.Println(req.Method, req.URL)
-   return http.DefaultTransport.RoundTrip(req)
+func (b *Bitrate) String() string {
+   var data []byte
+   for _, value := range b.Value {
+      if data != nil {
+         data = append(data, ", "...)
+      }
+      data = fmt.Appendf(data, "%v-%v", value[0], value[1])
+   }
+   return string(data)
 }
 
-func init() {
-   log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = Transport{}
+// github.com/golang/go/blob/go1.24.3/src/math/all_test.go#L2146
+func (b *Bitrate) contains(actual int) bool {
+   for _, correct := range b.Value {
+      if actual >= correct[0] {
+         if actual <= correct[1] {
+            return true
+         }
+      }
+   }
+   return false
 }
 
-// NO LOG
-// NO PROXY
-var Client = http.Client{
-   Transport: &http.Transport{},
+func (b *Bitrate) Set(data string) error {
+   var value [2]int
+   _, err := fmt.Sscanf(data, "%v-%v", &value[0], &value[1])
+   if err != nil {
+      return err
+   }
+   if b.Ok {
+      b.Value = append(b.Value, value)
+   } else {
+      b.Value = [][2]int{value}
+      b.Ok = true
+   }
+   return nil
+}
+
+type Bitrate struct {
+   Value [][2]int
+   Ok    bool
+}
+
+func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
+   defer resp.Body.Close()
+   data, err := io.ReadAll(resp.Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd.Set(resp.Request.URL)
+   represents := slices.SortedFunc(mpd.Representation(),
+      func(a, b *dash.Representation) int {
+         return a.Bandwidth - b.Bandwidth
+      },
+   )
+   for i, represent := range represents {
+      if i >= 1 {
+         fmt.Println()
+      }
+      fmt.Println(represent)
+      if correct.contains(represent.Bandwidth) {
+         switch {
+         case represent.SegmentBase != nil:
+            err = e.segment_base(represent)
+         case represent.SegmentList != nil:
+            err = e.segment_list(represent)
+         case represent.SegmentTemplate != nil:
+            err = e.segment_template(represent)
+         }
+         if err != nil {
+            return err
+         }
+      }
+   }
+   return nil
 }
 
 func create(represent *dash.Representation) (*os.File, error) {
@@ -410,28 +472,6 @@ func (e *License) segment_list(represent *dash.Representation) error {
       }
    }
    return nil
-}
-
-func get_segment(u *url.URL, head http.Header) ([]byte, error) {
-   req := http.Request{Method: "GET", URL: u}
-   if head != nil {
-      req.Header = head
-   } else {
-      req.Header = http.Header{}
-   }
-   resp, err := Client.Do(&req)
-   if err != nil {
-      return nil, err
-   }
-   defer resp.Body.Close()
-   switch resp.StatusCode {
-   case http.StatusOK, http.StatusPartialContent:
-   default:
-      var data strings.Builder
-      resp.Write(&data)
-      return nil, errors.New(data.String())
-   }
-   return io.ReadAll(resp.Body)
 }
 
 func (e *License) get_key(media *media_file) ([]byte, error) {
