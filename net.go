@@ -12,11 +12,38 @@ import (
    "io"
    "log"
    "net/http"
+   "net/url"
    "os"
    "slices"
    "strings"
    "time"
 )
+
+func init() {
+   log.SetFlags(log.Ltime)
+}
+
+func get_segment(u *url.URL, head http.Header) ([]byte, error) {
+   req := http.Request{Method: "GET", URL: u}
+   if head != nil {
+      req.Header = head
+   } else {
+      req.Header = http.Header{}
+   }
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {
+      return nil, err
+   }
+   defer resp.Body.Close()
+   switch resp.StatusCode {
+   case http.StatusOK, http.StatusPartialContent:
+   default:
+      var data strings.Builder
+      resp.Write(&data)
+      return nil, errors.New(data.String())
+   }
+   return io.ReadAll(resp.Body)
+}
 
 func (b *Bitrate) String() string {
    var data []byte
