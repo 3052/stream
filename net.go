@@ -88,45 +88,6 @@ type Bitrate struct {
    Ok    bool
 }
 
-func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
-   defer resp.Body.Close()
-   data, err := io.ReadAll(resp.Body)
-   if err != nil {
-      return err
-   }
-   var mpd dash.Mpd
-   err = mpd.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   mpd.Set(resp.Request.URL)
-   represents := slices.SortedFunc(mpd.Representation(),
-      func(a, b *dash.Representation) int {
-         return a.Bandwidth - b.Bandwidth
-      },
-   )
-   for i, represent := range represents {
-      if i >= 1 {
-         fmt.Println()
-      }
-      fmt.Println(represent)
-      if correct.contains(represent.Bandwidth) {
-         switch {
-         case represent.SegmentBase != nil:
-            err = e.segment_base(represent)
-         case represent.SegmentList != nil:
-            err = e.segment_list(represent)
-         case represent.SegmentTemplate != nil:
-            err = e.segment_template(represent)
-         }
-         if err != nil {
-            return err
-         }
-      }
-   }
-   return nil
-}
-
 func create(represent *dash.Representation) (*os.File, error) {
    var name strings.Builder
    name.WriteString(represent.Id)
@@ -552,4 +513,43 @@ func (e *License) get_key(media *media_file) ([]byte, error) {
       }
    }
    return nil, errors.New("get_key")
+}
+
+func (e *License) Bitrate(resp *http.Response, correct *Bitrate) error {
+   defer resp.Body.Close()
+   data, err := io.ReadAll(resp.Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd.Set(resp.Request.URL)
+   represents := slices.SortedFunc(mpd.Representation(),
+      func(a, b *dash.Representation) int {
+         return a.Bandwidth - b.Bandwidth
+      },
+   )
+   for i, represent := range represents {
+      if i >= 1 {
+         fmt.Println()
+      }
+      fmt.Println(represent)
+      if correct.contains(represent.Bandwidth) {
+         switch {
+         case represent.SegmentBase != nil:
+            err = e.segment_base(represent)
+         case represent.SegmentList != nil:
+            err = e.segment_list(represent)
+         case represent.SegmentTemplate != nil:
+            err = e.segment_template(represent)
+         }
+         if err != nil {
+            return err
+         }
+      }
+   }
+   return nil
 }
