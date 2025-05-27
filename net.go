@@ -18,10 +18,10 @@ import (
    "time"
 )
 
-type License struct {
+type Cdm struct {
    ClientId   string
    PrivateKey string
-   Widevine   func([]byte) ([]byte, error)
+   License   func([]byte) ([]byte, error)
 }
 
 func init() {
@@ -219,7 +219,7 @@ func (p *progress) durationB() time.Duration {
    return p.durationA() * time.Duration(p.segmentB) / time.Duration(p.segmentA)
 }
 
-func (e *License) segment_template(represent *dash.Representation) error {
+func (c *Cdm) segment_template(represent *dash.Representation) error {
    var media media_file
    err := media.New(represent)
    if err != nil {
@@ -248,7 +248,7 @@ func (e *License) segment_template(represent *dash.Representation) error {
          return err
       }
    }
-   key, err := e.get_key(&media)
+   key, err := c.get_key(&media)
    if err != nil {
       return err
    }
@@ -294,7 +294,7 @@ func (e *License) segment_template(represent *dash.Representation) error {
    return nil
 }
 
-func (e *License) segment_base(represent *dash.Representation) error {
+func (c *Cdm) segment_base(represent *dash.Representation) error {
    if Threads != 1 {
       return errors.New("Threads")
    }
@@ -322,7 +322,7 @@ func (e *License) segment_base(represent *dash.Representation) error {
    if err != nil {
       return err
    }
-   key, err := e.get_key(&media)
+   key, err := c.get_key(&media)
    if err != nil {
       return err
    }
@@ -366,7 +366,7 @@ func (e *License) segment_base(represent *dash.Representation) error {
    return nil
 }
 
-func (e *License) segment_list(represent *dash.Representation) error {
+func (c *Cdm) segment_list(represent *dash.Representation) error {
    if Threads != 1 {
       return errors.New("Threads")
    }
@@ -394,7 +394,7 @@ func (e *License) segment_list(represent *dash.Representation) error {
    if err != nil {
       return err
    }
-   key, err := e.get_key(&media)
+   key, err := c.get_key(&media)
    if err != nil {
       return err
    }
@@ -418,15 +418,15 @@ func (e *License) segment_list(represent *dash.Representation) error {
    return nil
 }
 
-func (e *License) get_key(media *media_file) ([]byte, error) {
+func (c *Cdm) get_key(media *media_file) ([]byte, error) {
    if media.key_id == nil {
       return nil, nil
    }
-   private_key, err := os.ReadFile(e.PrivateKey)
+   private_key, err := os.ReadFile(c.PrivateKey)
    if err != nil {
       return nil, err
    }
-   client_id, err := os.ReadFile(e.ClientId)
+   client_id, err := os.ReadFile(c.ClientId)
    if err != nil {
       return nil, err
    }
@@ -445,7 +445,7 @@ func (e *License) get_key(media *media_file) ([]byte, error) {
    if err != nil {
       return nil, err
    }
-   data, err = e.Widevine(data)
+   data, err = c.License(data)
    if err != nil {
       return nil, err
    }

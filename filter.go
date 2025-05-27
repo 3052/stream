@@ -34,7 +34,7 @@ func (f Filters) match(represent *dash.Representation) bool {
    return false
 }
 
-func (f Filters) Filter(resp *http.Response, v *License) error {
+func (f Filters) Filter(resp *http.Response, module *Cdm) error {
    if resp.StatusCode != http.StatusOK {
       var data strings.Builder
       resp.Write(&data)
@@ -64,11 +64,11 @@ func (f Filters) Filter(resp *http.Response, v *License) error {
       if f.match(represent) {
          switch {
          case represent.SegmentBase != nil:
-            err = v.segment_base(represent)
+            err = module.segment_base(represent)
          case represent.SegmentList != nil:
-            err = v.segment_list(represent)
+            err = module.segment_list(represent)
          case represent.SegmentTemplate != nil:
-            err = v.segment_template(represent)
+            err = module.segment_template(represent)
          }
          if err != nil {
             return err
