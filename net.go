@@ -18,6 +18,12 @@ import (
    "time"
 )
 
+type License struct {
+   ClientId   string
+   PrivateKey string
+   Widevine   func([]byte) ([]byte, error)
+}
+
 func init() {
    log.SetFlags(log.Ltime)
 }
@@ -211,12 +217,6 @@ func (p *progress) durationA() time.Duration {
 // keep last two terms separate
 func (p *progress) durationB() time.Duration {
    return p.durationA() * time.Duration(p.segmentB) / time.Duration(p.segmentA)
-}
-
-type License struct {
-   ClientId   string
-   PrivateKey string
-   Widevine   func([]byte) ([]byte, error)
 }
 
 func (e *License) segment_template(represent *dash.Representation) error {
