@@ -3,46 +3,34 @@ package net
 import (
    "41.neocities.org/dash"
    "errors"
-   "flag"
    "fmt"
    "io"
    "net/http"
    "slices"
-   "strconv"
    "strings"
 )
 
-type bandwidth struct {
-   start int
-   end   int
-}
-
-type filter struct {
-   bandwidth bandwidth
-   language  string
-}
-
-func (f *filter) String() string {
+func (f *Filter) String() string {
    var b []byte
-   if f.bandwidth.start >= 1 {
-      b = fmt.Append(b, "bs=", f.bandwidth.start)
+   if f.BitrateStart >= 1 {
+      b = fmt.Append(b, "bs=", f.BitrateStart)
    }
-   if f.bandwidth.end >= 1 {
+   if f.BitrateEnd >= 1 {
       if b != nil {
          b = append(b, ';')
       }
-      b = fmt.Append(b, "be=", f.bandwidth.end)
+      b = fmt.Append(b, "be=", f.BitrateEnd)
    }
-   if f.language != "" {
+   if f.Language != "" {
       if b != nil {
          b = append(b, ';')
       }
-      b = fmt.Append(b, "l=", f.language)
+      b = fmt.Append(b, "l=", f.Language)
    }
    return string(b)
 }
 
-func (f *filter) Set(data string) error {
+func (f *Filter) Set(data string) error {
    cookies, err := http.ParseCookie(data)
    if err != nil {
       return err
@@ -50,11 +38,11 @@ func (f *filter) Set(data string) error {
    for _, cookie := range cookies {
       switch cookie.Name {
       case "bs":
-         _, err = fmt.Sscan(cookie.Value, &f.bandwidth.start)
+         _, err = fmt.Sscan(cookie.Value, &f.BitrateStart)
       case "be":
-         _, err = fmt.Sscan(cookie.Value, &f.bandwidth.end)
+         _, err = fmt.Sscan(cookie.Value, &f.BitrateEnd)
       case "l":
-         f.language = cookie.Value
+         f.Language = cookie.Value
       }
       if err != nil {
          return err
@@ -63,9 +51,9 @@ func (f *filter) Set(data string) error {
    return nil
 }
 
-type filters []filter
+type Filters []Filter
 
-func (f filters) String() string {
+func (f Filters) String() string {
    var b []byte
    for i, value := range f {
       if i >= 1 {
@@ -76,10 +64,10 @@ func (f filters) String() string {
    return string(b)
 }
 
-func (f *filters) Set(data string) error {
+func (f *Filters) Set(data string) error {
    *f = nil
    for _, data := range strings.Split(data, ",") {
-      var filter1 filter
+      var filter1 Filter
       err := filter1.Set(data)
       if err != nil {
          return err
@@ -89,9 +77,15 @@ func (f *filters) Set(data string) error {
    return nil
 }
 
+type Filter struct {
+   BitrateStart int
+   BitrateEnd   int
+   Language     string
+}
+
 // wikipedia.org/wiki/Filter_(higher-order_function)
-const usage = `bs = bandwidth start
-be = bandwidth end
+const usage = `bs = bitrate start
+be = bitrate end
 l = language
 `
 

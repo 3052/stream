@@ -21,7 +21,7 @@ import (
 type Cdm struct {
    ClientId   string
    PrivateKey string
-   License   func([]byte) ([]byte, error)
+   License    func([]byte) ([]byte, error)
 }
 
 func init() {
