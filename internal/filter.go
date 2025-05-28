@@ -38,16 +38,13 @@ func (f *filter) Set(data string) error {
       switch cookie.Name {
       case "bs":
          _, err = fmt.Sscan(cookie.Value, &f.bandwidth.start)
-         if err != nil {
-            return err
-         }
       case "be":
          _, err = fmt.Sscan(cookie.Value, &f.bandwidth.end)
-         if err != nil {
-            return err
-         }
       case "l":
          f.language = cookie.Value
+      }
+      if err != nil {
+         return err
       }
    }
    return nil
@@ -55,12 +52,12 @@ func (f *filter) Set(data string) error {
 
 type bandwidth struct {
    start int
-   end int
+   end   int
 }
 
 type filter struct {
    bandwidth bandwidth
-   language      string
+   language  string
 }
 
 func (f filters) String() string {
@@ -94,8 +91,8 @@ l = language
 
 func main() {
    filters1 := filters{
-      { bandwidth: bandwidth{100_000, 200_000}, language: "english" },
-      { bandwidth: bandwidth{3_000_000, 4_000_000} },
+      {bandwidth: bandwidth{100_000, 200_000}, language: "english"},
+      {bandwidth: bandwidth{3_000_000, 4_000_000}},
    }
    flag.Var(&filters1, "f", usage)
    flag.Usage()
