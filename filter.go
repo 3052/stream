@@ -10,6 +10,17 @@ import (
    "strings"
 )
 
+type Filter struct {
+   BitrateStart int
+   BitrateEnd   int
+   Language     string
+}
+
+const FilterUsage = `bs = bitrate start
+be = bitrate end
+l = language
+`
+
 func (f *Filter) String() string {
    var b []byte
    if f.BitrateStart >= 1 {
@@ -77,22 +88,6 @@ func (f *Filters) Set(data string) error {
    return nil
 }
 
-type Filter struct {
-   BitrateStart int
-   BitrateEnd   int
-   Language     string
-}
-
-// wikipedia.org/wiki/Filter_(higher-order_function)
-const usage = `bs = bitrate start
-be = bitrate end
-l = language
-`
-
-func (f Filters) match(represent *dash.Representation) bool {
-   return false
-}
-
 func (f Filters) Filter(resp *http.Response, module *Cdm) error {
    if resp.StatusCode != http.StatusOK {
       var data strings.Builder
@@ -135,4 +130,20 @@ func (f Filters) Filter(resp *http.Response, module *Cdm) error {
       }
    }
    return nil
+}
+
+func (f Filters) match(r *dash.Representation) bool {
+   for _, filter1 := range f {
+      if r.Bandwidth >= filter1.BitrateStart {
+         if r.Bandwidth <= filter1.BitrateEnd {
+            if filter1.Language == "" {
+               return true
+            }
+            if r.GetAdaptationSet().Lang == filter1.Language {
+               return true
+            }
+         }
+      }
+   }
+   return false
 }

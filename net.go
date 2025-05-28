@@ -8,6 +8,7 @@ import (
    "bytes"
    "encoding/base64"
    "errors"
+   "fmt"
    "io"
    "log"
    "net/http"
@@ -17,6 +18,92 @@ import (
    "strings"
    "time"
 )
+
+func (i *index_range) Set(data string) error {
+   _, err := fmt.Sscanf(data, "%v-%v", &i[0], &i[1])
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+type index_range [2]uint64
+
+func (i *index_range) String() string {
+   return fmt.Sprintf("%v-%v", i[0], i[1])
+}
+
+func (c *Cdm) segment_base(represent *dash.Representation) error {
+   if Threads != 1 {
+      return errors.New("Threads")
+   }
+   var media media_file
+   err := media.New(represent)
+   if err != nil {
+      return err
+   }
+   os_file, err := create(represent)
+   if err != nil {
+      return err
+   }
+   defer os_file.Close()
+   data, err := get_segment(represent.BaseUrl[0], http.Header{
+      "range": {"bytes=" + represent.SegmentBase.Initialization.Range},
+   })
+   if err != nil {
+      return err
+   }
+   data, err = media.initialization(data)
+   if err != nil {
+      return err
+   }
+   _, err = os_file.Write(data)
+   if err != nil {
+      return err
+   }
+   key, err := c.get_key(&media)
+   if err != nil {
+      return err
+   }
+   data, err = get_segment(represent.BaseUrl[0], http.Header{
+      "range": {"bytes=" + represent.SegmentBase.IndexRange},
+   })
+   if err != nil {
+      return err
+   }
+   var file_file file.File
+   err = file_file.Read(data)
+   if err != nil {
+      return err
+   }
+   var progress1 progress
+   progress1.set(len(file_file.Sidx.Reference))
+   head := http.Header{}
+   var index index_range
+   err = index.Set(represent.SegmentBase.IndexRange)
+   if err != nil {
+      return err
+   }
+   for _, reference := range file_file.Sidx.Reference {
+      index[0] = index[1] + 1
+      index[1] += uint64(reference.Size())
+      head.Set("range", "bytes="+index.String())
+      data, err = get_segment(represent.BaseUrl[0], head)
+      if err != nil {
+         return err
+      }
+      progress1.next()
+      data, err = media.write_segment(data, key)
+      if err != nil {
+         return err
+      }
+      _, err = os_file.Write(data)
+      if err != nil {
+         return err
+      }
+   }
+   return nil
+}
 
 type Cdm struct {
    ClientId   string
@@ -289,78 +376,6 @@ func (c *Cdm) segment_template(represent *dash.Representation) error {
          if err != nil {
             return err
          }
-      }
-   }
-   return nil
-}
-
-func (c *Cdm) segment_base(represent *dash.Representation) error {
-   if Threads != 1 {
-      return errors.New("Threads")
-   }
-   var media media_file
-   err := media.New(represent)
-   if err != nil {
-      return err
-   }
-   file1, err := create(represent)
-   if err != nil {
-      return err
-   }
-   defer file1.Close()
-   data, err := get_segment(represent.BaseUrl[0], http.Header{
-      "range": {"bytes=" + represent.SegmentBase.Initialization.Range},
-   })
-   if err != nil {
-      return err
-   }
-   data, err = media.initialization(data)
-   if err != nil {
-      return err
-   }
-   _, err = file1.Write(data)
-   if err != nil {
-      return err
-   }
-   key, err := c.get_key(&media)
-   if err != nil {
-      return err
-   }
-   data, err = get_segment(represent.BaseUrl[0], http.Header{
-      "range": {"bytes=" + represent.SegmentBase.IndexRange},
-   })
-   if err != nil {
-      return err
-   }
-   var file2 file.File
-   err = file2.Read(data)
-   if err != nil {
-      return err
-   }
-   var progress1 progress
-   progress1.set(len(file2.Sidx.Reference))
-   head := http.Header{}
-   var index dash.Range
-   err = index.Set(represent.SegmentBase.IndexRange)
-   if err != nil {
-      return err
-   }
-   for _, reference := range file2.Sidx.Reference {
-      index[0] = index[1] + 1
-      index[1] += uint64(reference.Size())
-      head.Set("range", "bytes="+index.String())
-      data, err = get_segment(represent.BaseUrl[0], head)
-      if err != nil {
-         return err
-      }
-      progress1.next()
-      data, err = media.write_segment(data, key)
-      if err != nil {
-         return err
-      }
-      _, err = file1.Write(data)
-      if err != nil {
-         return err
       }
    }
    return nil
