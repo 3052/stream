@@ -19,6 +19,170 @@ import (
    "time"
 )
 
+const FilterUsage = `bs = bitrate start
+be = bitrate end
+l = language
+r = role`
+
+func (f *Filter) String() string {
+   var b []byte
+   if f.BitrateStart >= 1 {
+      b = fmt.Append(b, "bs=", f.BitrateStart)
+   }
+   if f.BitrateEnd >= 1 {
+      if b != nil {
+         b = append(b, ';')
+      }
+      b = fmt.Append(b, "be=", f.BitrateEnd)
+   }
+   if f.Language != "" {
+      if b != nil {
+         b = append(b, ';')
+      }
+      b = fmt.Append(b, "l=", f.Language)
+   }
+   if f.Role != "" {
+      if b != nil {
+         b = append(b, ';')
+      }
+      b = fmt.Append(b, "r=", f.Role)
+   }
+   return string(b)
+}
+
+type Filters []Filter
+
+func (f Filters) String() string {
+   var b []byte
+   for i, value := range f {
+      if i >= 1 {
+         b = append(b, ',')
+      }
+      b = fmt.Append(b, &value)
+   }
+   return string(b)
+}
+
+func (f *Filters) Set(data string) error {
+   *f = nil
+   for _, data := range strings.Split(data, ",") {
+      var filter1 Filter
+      err := filter1.Set(data)
+      if err != nil {
+         return err
+      }
+      *f = append(*f, filter1)
+   }
+   return nil
+}
+
+func (f Filters) Filter(resp *http.Response, module *Cdm) error {
+   if resp.StatusCode != http.StatusOK {
+      var data strings.Builder
+      resp.Write(&data)
+      return errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   data, err := io.ReadAll(resp.Body)
+   if err != nil {
+      return err
+   }
+   var mpd dash.Mpd
+   err = mpd.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   mpd.Set(resp.Request.URL)
+   represents := slices.SortedFunc(mpd.Representation(),
+      func(a, b *dash.Representation) int {
+         return a.Bandwidth - b.Bandwidth
+      },
+   )
+   for i, represent := range represents {
+      if i >= 1 {
+         fmt.Println()
+      }
+      fmt.Println(represent)
+      if f.representation_ok(represent) {
+         switch {
+         case represent.SegmentBase != nil:
+            err = module.segment_base(represent)
+         case represent.SegmentList != nil:
+            err = module.segment_list(represent)
+         case represent.SegmentTemplate != nil:
+            err = module.segment_template(represent)
+         }
+         if err != nil {
+            return err
+         }
+      }
+   }
+   return nil
+}
+
+func (f *Filter) Set(data string) error {
+   cookies, err := http.ParseCookie(data)
+   if err != nil {
+      return err
+   }
+   for _, cookie := range cookies {
+      switch cookie.Name {
+      case "bs":
+         _, err = fmt.Sscan(cookie.Value, &f.BitrateStart)
+      case "be":
+         _, err = fmt.Sscan(cookie.Value, &f.BitrateEnd)
+      case "l":
+         f.Language = cookie.Value
+      case "r":
+         f.Role = cookie.Value
+      default:
+         err = errors.New(".Name")
+      }
+      if err != nil {
+         return err
+      }
+   }
+   return nil
+}
+
+type Filter struct {
+   BitrateStart int
+   BitrateEnd   int
+   Language     string
+   Role         string
+}
+
+func (f *Filter) role_ok(r *dash.Representation) bool {
+   switch f.Role {
+   case "", r.GetAdaptationSet().GetRole():
+      return true
+   }
+   return false
+}
+
+func (f *Filter) language_ok(r *dash.Representation) bool {
+   switch f.Language {
+   case "", r.GetAdaptationSet().Lang:
+      return true
+   }
+   return false
+}
+
+func (f Filters) representation_ok(r *dash.Representation) bool {
+   for _, filter1 := range f {
+      if r.Bandwidth >= filter1.BitrateStart {
+         if r.Bandwidth <= filter1.BitrateEnd {
+            if filter1.language_ok(r) {
+               if filter1.role_ok(r) {
+                  return true
+               }
+            }
+         }
+      }
+   }
+   return false
+}
+
 func (i *index_range) Set(data string) error {
    _, err := fmt.Sscanf(data, "%v-%v", &i[0], &i[1])
    if err != nil {
@@ -33,108 +197,10 @@ func (i *index_range) String() string {
    return fmt.Sprintf("%v-%v", i[0], i[1])
 }
 
-func (c *Cdm) segment_base(represent *dash.Representation) error {
-   if Threads != 1 {
-      return errors.New("Threads")
-   }
-   var media media_file
-   err := media.New(represent)
-   if err != nil {
-      return err
-   }
-   os_file, err := create(represent)
-   if err != nil {
-      return err
-   }
-   defer os_file.Close()
-   data, err := get_segment(represent.BaseUrl[0], http.Header{
-      "range": {"bytes=" + represent.SegmentBase.Initialization.Range},
-   })
-   if err != nil {
-      return err
-   }
-   data, err = media.initialization(data)
-   if err != nil {
-      return err
-   }
-   _, err = os_file.Write(data)
-   if err != nil {
-      return err
-   }
-   key, err := c.get_key(&media)
-   if err != nil {
-      return err
-   }
-   data, err = get_segment(represent.BaseUrl[0], http.Header{
-      "range": {"bytes=" + represent.SegmentBase.IndexRange},
-   })
-   if err != nil {
-      return err
-   }
-   var file_file file.File
-   err = file_file.Read(data)
-   if err != nil {
-      return err
-   }
-   var progress1 progress
-   progress1.set(len(file_file.Sidx.Reference))
-   head := http.Header{}
-   var index index_range
-   err = index.Set(represent.SegmentBase.IndexRange)
-   if err != nil {
-      return err
-   }
-   for _, reference := range file_file.Sidx.Reference {
-      index[0] = index[1] + 1
-      index[1] += uint64(reference.Size())
-      head.Set("range", "bytes="+index.String())
-      data, err = get_segment(represent.BaseUrl[0], head)
-      if err != nil {
-         return err
-      }
-      progress1.next()
-      data, err = media.write_segment(data, key)
-      if err != nil {
-         return err
-      }
-      _, err = os_file.Write(data)
-      if err != nil {
-         return err
-      }
-   }
-   return nil
-}
-
 type Cdm struct {
    ClientId   string
    PrivateKey string
    License    func([]byte) ([]byte, error)
-}
-
-func init() {
-   log.SetFlags(log.Ltime)
-}
-
-func get_segment(u *url.URL, head http.Header) ([]byte, error) {
-   req := http.Request{Method: "GET", URL: u}
-   if head != nil {
-      req.Header = head
-   } else {
-      req.Header = http.Header{}
-   }
-   resp, err := http.DefaultClient.Do(&req)
-   if err != nil {
-      return nil, err
-   }
-   switch resp.StatusCode {
-   case http.StatusOK, http.StatusPartialContent:
-   default:
-      var data strings.Builder
-      resp.Write(&data)
-      return nil, errors.New(data.String())
-   }
-   defer resp.Body.Close()
-   return io.ReadAll(resp.Body)
 }
 
 func create(represent *dash.Representation) (*os.File, error) {
@@ -484,4 +550,117 @@ func (c *Cdm) get_key(media *media_file) ([]byte, error) {
       }
    }
    return nil, errors.New("get_key")
+}
+
+func (c *Cdm) segment_base(represent *dash.Representation) error {
+   if Threads != 1 {
+      return errors.New("Threads")
+   }
+   var media media_file
+   err := media.New(represent)
+   if err != nil {
+      return err
+   }
+   os_file, err := create(represent)
+   if err != nil {
+      return err
+   }
+   defer os_file.Close()
+   head := http.Header{}
+   head.Set("range", "bytes=" + represent.SegmentBase.Initialization.Range)
+   data, err := get_segment(represent.BaseUrl[0], head)
+   if err != nil {
+      return err
+   }
+   data, err = media.initialization(data)
+   if err != nil {
+      return err
+   }
+   _, err = os_file.Write(data)
+   if err != nil {
+      return err
+   }
+   key, err := c.get_key(&media)
+   if err != nil {
+      return err
+   }
+   head.Set("range", "bytes=" + represent.SegmentBase.IndexRange)
+   data, err = get_segment(represent.BaseUrl[0], head)
+   if err != nil {
+      return err
+   }
+   var file_file file.File
+   err = file_file.Read(data)
+   if err != nil {
+      return err
+   }
+   var progress1 progress
+   progress1.set(len(file_file.Sidx.Reference))
+   var index index_range
+   err = index.Set(represent.SegmentBase.IndexRange)
+   if err != nil {
+      return err
+   }
+   for _, reference := range file_file.Sidx.Reference {
+      index[0] = index[1] + 1
+      index[1] += uint64(reference.Size())
+      head.Set("range", "bytes="+index.String())
+      data, err = get_segment(represent.BaseUrl[0], head)
+      if err != nil {
+         return err
+      }
+      progress1.next()
+      data, err = media.write_segment(data, key)
+      if err != nil {
+         return err
+      }
+      _, err = os_file.Write(data)
+      if err != nil {
+         return err
+      }
+   }
+   return nil
+}
+
+func Transport(proxy *url.URL) *http.Transport {
+   log.SetFlags(log.Ltime)
+   return &http.Transport{
+      Protocols: &http.Protocols{}, // github.com/golang/go/issues/25793
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         if req.Header.Get("silent") == "" {
+            if req.Header.Get("proxy") != "" {
+               log.Println("proxy", req.Method, req.URL)
+            } else {
+               log.Println(req.Method, req.URL)
+            }
+         }
+         if req.Header.Get("proxy") != "" {
+            return proxy, nil
+         }
+         return nil, nil
+      },
+   }
+}
+
+func get_segment(u *url.URL, head http.Header) ([]byte, error) {
+   req := http.Request{Method: "GET", URL: u}
+   if head != nil {
+      req.Header = head
+   } else {
+      req.Header = http.Header{}
+   }
+   req.Header.Set("silent", "true")
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {
+      return nil, err
+   }
+   switch resp.StatusCode {
+   case http.StatusOK, http.StatusPartialContent:
+   default:
+      var data strings.Builder
+      resp.Write(&data)
+      return nil, errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   return io.ReadAll(resp.Body)
 }
