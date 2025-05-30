@@ -13,8 +13,7 @@ import (
 const FilterUsage = `bs = bitrate start
 be = bitrate end
 l = language
-r = role
-`
+r = role`
 
 func (f *Filter) String() string {
    var b []byte
