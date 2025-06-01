@@ -7,18 +7,6 @@ import (
    "strings"
 )
 
-func Proxy(username, password, hostname string) string {
-   var b strings.Builder
-   b.WriteString("https://")
-   b.WriteString(username)
-   b.WriteByte(':')
-   b.WriteString(password)
-   b.WriteByte('@')
-   b.WriteString(hostname)
-   b.WriteString(":89")
-   return b.String()
-}
-
 type ServerLoad struct {
    Count    int
    Country  string
@@ -40,6 +28,18 @@ type Server struct {
    Technologies []struct {
       Identifier string
    }
+}
+
+func Proxy(username, password, hostname string) string {
+   var b strings.Builder
+   b.WriteString("https://")
+   b.WriteString(username)
+   b.WriteByte(':')
+   b.WriteString(password)
+   b.WriteByte('@')
+   b.WriteString(hostname)
+   b.WriteString(":89")
+   return b.String()
 }
 
 // limit <= -1 for default
@@ -88,7 +88,16 @@ func GetServerLoads(servers []Server) ServerLoads {
    return loads
 }
 
-func (s ServerLoads) Country(code string) string {
+func (s *Server) proxy_ssl() bool {
+   for _, technology := range s.Technologies {
+      if technology.Identifier == "proxy_ssl" {
+         return true
+      }
+   }
+   return false
+}
+
+func (s ServerLoads) Country(code string) (string, bool) {
    var load *ServerLoad
    for _, load1 := range s {
       if load1.Country == code {
@@ -100,15 +109,9 @@ func (s ServerLoads) Country(code string) string {
          load = load1
       }
    }
-   load.Count++
-   return load.Hostname
-}
-
-func (s *Server) proxy_ssl() bool {
-   for _, technology := range s.Technologies {
-      if technology.Identifier == "proxy_ssl" {
-         return true
-      }
+   if load != nil {
+      load.Count++
+      return load.Hostname, true
    }
-   return false
+   return "", false
 }

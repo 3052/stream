@@ -1,6 +1,7 @@
 package main
 
 import (
+   "41.neocities.org/net"
    "41.neocities.org/net/nord"
    "errors"
    "flag"
@@ -16,12 +17,7 @@ import (
 )
 
 func do_country(name, code string) error {
-   data, err := command("password", "-i", "nordvpn.com")
-   if err != nil {
-      return err
-   }
-   username, password, _ := strings.Cut(string(data), ":")
-   data, err = read_file(name)
+   data, err := read_file(name)
    if err != nil {
       return err
    }
@@ -29,6 +25,10 @@ func do_country(name, code string) error {
    err = loads.Unmarshal(data)
    if err != nil {
       return err
+   }
+   country, ok := loads.Country(code)
+   if !ok {
+      return errors.New(".Country")
    }
    data, err = loads.Marshal()
    if err != nil {
@@ -38,15 +38,18 @@ func do_country(name, code string) error {
    if err != nil {
       return err
    }
-   fmt.Println(
-      nord.Proxy(username, password, loads.Country(code)),
-   )
+   data, err = command("password", "-i", "nordvpn.com")
+   if err != nil {
+      return err
+   }
+   username, password, _ := strings.Cut(string(data), ":")
+   fmt.Println(nord.Proxy(username, password, country))
    return nil
 }
 
 func main() {
+   http.DefaultTransport = net.Transport(nil)
    log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = transport{}
    write := flag.Bool("w", false, "write")
    country_code := flag.String("c", "", "country code")
    flag.Parse()
@@ -57,26 +60,16 @@ func main() {
    name = filepath.ToSlash(name) + "/net/nord/ServerLoads"
    switch {
    case *country_code != "":
-      err := do_country(name, *country_code)
-      if err != nil {
-         panic(err)
-      }
+      err = do_country(name, *country_code)
    case *write:
-      err := do_write(name)
-      if err != nil {
-         panic(err)
-      }
+      err = do_write(name)
    default:
       flag.Usage()
    }
+   if err != nil {
+      panic(err)
+   }
 }
-
-func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
-   log.Println(req.Method, req.URL)
-   return http.DefaultTransport.RoundTrip(req)
-}
-
-type transport struct{}
 
 func do_write(name string) error {
    servers, err := nord.GetServers(0)
@@ -89,6 +82,7 @@ func do_write(name string) error {
    }
    return write_file(name, data)
 }
+
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)

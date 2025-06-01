@@ -19,6 +19,48 @@ import (
    "time"
 )
 
+func Transport(proxy *url.URL) *http.Transport {
+   log.SetFlags(log.Ltime)
+   return &http.Transport{
+      Protocols: &http.Protocols{}, // github.com/golang/go/issues/25793
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         if req.Header.Get("silent") == "" {
+            if req.Header.Get("proxy") != "" {
+               log.Println("proxy", req.Method, req.URL)
+            } else {
+               log.Println(req.Method, req.URL)
+            }
+         }
+         if req.Header.Get("proxy") != "" {
+            return proxy, nil
+         }
+         return nil, nil
+      },
+   }
+}
+
+func get_segment(u *url.URL, head http.Header) ([]byte, error) {
+   req := http.Request{Method: "GET", URL: u}
+   if head != nil {
+      req.Header = head
+   } else {
+      req.Header = http.Header{}
+   }
+   req.Header.Set("silent", "true")
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {
+      return nil, err
+   }
+   switch resp.StatusCode {
+   case http.StatusOK, http.StatusPartialContent:
+   default:
+      var data strings.Builder
+      resp.Write(&data)
+      return nil, errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   return io.ReadAll(resp.Body)
+}
 const FilterUsage = `bs = bitrate start
 be = bitrate end
 l = language
@@ -620,47 +662,4 @@ func (c *Cdm) segment_base(represent *dash.Representation) error {
       }
    }
    return nil
-}
-
-func Transport(proxy *url.URL) *http.Transport {
-   log.SetFlags(log.Ltime)
-   return &http.Transport{
-      Protocols: &http.Protocols{}, // github.com/golang/go/issues/25793
-      Proxy: func(req *http.Request) (*url.URL, error) {
-         if req.Header.Get("silent") == "" {
-            if req.Header.Get("proxy") != "" {
-               log.Println("proxy", req.Method, req.URL)
-            } else {
-               log.Println(req.Method, req.URL)
-            }
-         }
-         if req.Header.Get("proxy") != "" {
-            return proxy, nil
-         }
-         return nil, nil
-      },
-   }
-}
-
-func get_segment(u *url.URL, head http.Header) ([]byte, error) {
-   req := http.Request{Method: "GET", URL: u}
-   if head != nil {
-      req.Header = head
-   } else {
-      req.Header = http.Header{}
-   }
-   req.Header.Set("silent", "true")
-   resp, err := http.DefaultClient.Do(&req)
-   if err != nil {
-      return nil, err
-   }
-   switch resp.StatusCode {
-   case http.StatusOK, http.StatusPartialContent:
-   default:
-      var data strings.Builder
-      resp.Write(&data)
-      return nil, errors.New(data.String())
-   }
-   defer resp.Body.Close()
-   return io.ReadAll(resp.Body)
 }
