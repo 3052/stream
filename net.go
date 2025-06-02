@@ -19,128 +19,6 @@ import (
    "time"
 )
 
-func (c *Cdm) get_key(media *media_file) ([]byte, error) {
-   if media.key_id == nil {
-      return nil, nil
-   }
-   private_key, err := os.ReadFile(c.PrivateKey)
-   if err != nil {
-      return nil, err
-   }
-   client_id, err := os.ReadFile(c.ClientId)
-   if err != nil {
-      return nil, err
-   }
-   if media.pssh == nil {
-      var pssh1 widevine.Pssh
-      pssh1.KeyIds = [][]byte{media.key_id}
-      media.pssh = pssh1.Marshal()
-   }
-   log.Println("PSSH", base64.StdEncoding.EncodeToString(media.pssh))
-   var module widevine.Cdm
-   err = module.New(private_key, client_id, media.pssh)
-   if err != nil {
-      return nil, err
-   }
-   data, err := module.RequestBody()
-   if err != nil {
-      return nil, err
-   }
-   data, err = c.License(data)
-   if err != nil {
-      return nil, err
-   }
-   var body widevine.ResponseBody
-   err = body.Unmarshal(data)
-   if err != nil {
-      return nil, err
-   }
-   block, err := module.Block(body)
-   if err != nil {
-      return nil, err
-   }
-   for container := range body.Container() {
-      if bytes.Equal(container.Id(), media.key_id) {
-         key := container.Key(block)
-         log.Println("key", base64.StdEncoding.EncodeToString(key))
-         var zero [16]byte
-         if !bytes.Equal(key, zero[:]) {
-            return key, nil
-         }
-      }
-   }
-   return nil, errors.New("get_key")
-}
-
-func (c *Cdm) segment_base(represent *dash.Representation) error {
-   if Threads != 1 {
-      return errors.New("Threads")
-   }
-   var media media_file
-   err := media.New(represent)
-   if err != nil {
-      return err
-   }
-   os_file, err := create(represent)
-   if err != nil {
-      return err
-   }
-   defer os_file.Close()
-   head := http.Header{}
-   head.Set("range", "bytes=" + represent.SegmentBase.Initialization.Range)
-   data, err := get_segment(represent.BaseUrl[0], head)
-   if err != nil {
-      return err
-   }
-   data, err = media.initialization(data)
-   if err != nil {
-      return err
-   }
-   _, err = os_file.Write(data)
-   if err != nil {
-      return err
-   }
-   key, err := c.get_key(&media)
-   if err != nil {
-      return err
-   }
-   head.Set("range", "bytes=" + represent.SegmentBase.IndexRange)
-   data, err = get_segment(represent.BaseUrl[0], head)
-   if err != nil {
-      return err
-   }
-   var file_file file.File
-   err = file_file.Read(data)
-   if err != nil {
-      return err
-   }
-   var progress1 progress
-   progress1.set(len(file_file.Sidx.Reference))
-   var index index_range
-   err = index.Set(represent.SegmentBase.IndexRange)
-   if err != nil {
-      return err
-   }
-   for _, reference := range file_file.Sidx.Reference {
-      index[0] = index[1] + 1
-      index[1] += uint64(reference.Size())
-      head.Set("range", "bytes="+index.String())
-      data, err = get_segment(represent.BaseUrl[0], head)
-      if err != nil {
-         return err
-      }
-      progress1.next()
-      data, err = media.write_segment(data, key)
-      if err != nil {
-         return err
-      }
-      _, err = os_file.Write(data)
-      if err != nil {
-         return err
-      }
-   }
-   return nil
-}
 func Transport(proxy *url.URL) *http.Transport {
    log.SetFlags(log.Ltime)
    return &http.Transport{
@@ -154,6 +32,9 @@ func Transport(proxy *url.URL) *http.Transport {
             }
          }
          if req.Header.Get("proxy") != "" {
+            return proxy, nil
+         }
+         if proxy.Hostname() == "localhost" {
             return proxy, nil
          }
          return nil, nil
@@ -493,6 +374,128 @@ func (c *Cdm) segment_list(represent *dash.Representation) error {
          return err
       }
       _, err = file1.Write(data)
+      if err != nil {
+         return err
+      }
+   }
+   return nil
+}
+func (c *Cdm) get_key(media *media_file) ([]byte, error) {
+   if media.key_id == nil {
+      return nil, nil
+   }
+   private_key, err := os.ReadFile(c.PrivateKey)
+   if err != nil {
+      return nil, err
+   }
+   client_id, err := os.ReadFile(c.ClientId)
+   if err != nil {
+      return nil, err
+   }
+   if media.pssh == nil {
+      var pssh1 widevine.Pssh
+      pssh1.KeyIds = [][]byte{media.key_id}
+      media.pssh = pssh1.Marshal()
+   }
+   log.Println("PSSH", base64.StdEncoding.EncodeToString(media.pssh))
+   var module widevine.Cdm
+   err = module.New(private_key, client_id, media.pssh)
+   if err != nil {
+      return nil, err
+   }
+   data, err := module.RequestBody()
+   if err != nil {
+      return nil, err
+   }
+   data, err = c.License(data)
+   if err != nil {
+      return nil, err
+   }
+   var body widevine.ResponseBody
+   err = body.Unmarshal(data)
+   if err != nil {
+      return nil, err
+   }
+   block, err := module.Block(body)
+   if err != nil {
+      return nil, err
+   }
+   for container := range body.Container() {
+      if bytes.Equal(container.Id(), media.key_id) {
+         key := container.Key(block)
+         log.Println("key", base64.StdEncoding.EncodeToString(key))
+         var zero [16]byte
+         if !bytes.Equal(key, zero[:]) {
+            return key, nil
+         }
+      }
+   }
+   return nil, errors.New("get_key")
+}
+
+func (c *Cdm) segment_base(represent *dash.Representation) error {
+   if Threads != 1 {
+      return errors.New("Threads")
+   }
+   var media media_file
+   err := media.New(represent)
+   if err != nil {
+      return err
+   }
+   os_file, err := create(represent)
+   if err != nil {
+      return err
+   }
+   defer os_file.Close()
+   head := http.Header{}
+   head.Set("range", "bytes=" + represent.SegmentBase.Initialization.Range)
+   data, err := get_segment(represent.BaseUrl[0], head)
+   if err != nil {
+      return err
+   }
+   data, err = media.initialization(data)
+   if err != nil {
+      return err
+   }
+   _, err = os_file.Write(data)
+   if err != nil {
+      return err
+   }
+   key, err := c.get_key(&media)
+   if err != nil {
+      return err
+   }
+   head.Set("range", "bytes=" + represent.SegmentBase.IndexRange)
+   data, err = get_segment(represent.BaseUrl[0], head)
+   if err != nil {
+      return err
+   }
+   var file_file file.File
+   err = file_file.Read(data)
+   if err != nil {
+      return err
+   }
+   var progress1 progress
+   progress1.set(len(file_file.Sidx.Reference))
+   var index index_range
+   err = index.Set(represent.SegmentBase.IndexRange)
+   if err != nil {
+      return err
+   }
+   for _, reference := range file_file.Sidx.Reference {
+      index[0] = index[1] + 1
+      index[1] += uint64(reference.Size())
+      head.Set("range", "bytes="+index.String())
+      data, err = get_segment(represent.BaseUrl[0], head)
+      if err != nil {
+         return err
+      }
+      progress1.next()
+      data, err = media.write_segment(data, key)
+      if err != nil {
+         return err
+      }
+      _, err = os_file.Write(data)
       if err != nil {
          return err
       }
