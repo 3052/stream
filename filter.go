@@ -15,6 +15,29 @@ be = bitrate end
 l = language
 r = role`
 
+func (f *Filter) bitrate_end_ok(r *dash.Representation) bool {
+   if f.BitrateEnd == 0 {
+      return true
+   }
+   return r.Bandwidth <= f.BitrateEnd
+}
+
+func (f *Filter) role_ok(r *dash.Representation) bool {
+   switch f.Role {
+   case "", r.GetAdaptationSet().GetRole():
+      return true
+   }
+   return false
+}
+
+func (f *Filter) language_ok(r *dash.Representation) bool {
+   switch f.Language {
+   case "", r.GetAdaptationSet().Lang:
+      return true
+   }
+   return false
+}
+
 func (f *Filter) Set(data string) error {
    cookies, err := http.ParseCookie(data)
    if err != nil {
@@ -143,8 +166,6 @@ func (f Filters) Filter(resp *http.Response, module *Cdm) error {
    return nil
 }
 
-///
-
 func (f Filters) representation_ok(r *dash.Representation) bool {
    for _, filter1 := range f {
       if r.Bandwidth >= filter1.BitrateStart {
@@ -156,29 +177,6 @@ func (f Filters) representation_ok(r *dash.Representation) bool {
             }
          }
       }
-   }
-   return false
-}
-
-func (f *Filter) bitrate_end_ok(r *dash.Representation) bool {
-   if f.BitrateEnd == 0 {
-      return true
-   }
-   return r.Bandwidth <= f.BitrateEnd
-}
-
-func (f *Filter) role_ok(r *dash.Representation) bool {
-   switch f.Role {
-   case "", r.GetAdaptationSet().GetRole():
-      return true
-   }
-   return false
-}
-
-func (f *Filter) language_ok(r *dash.Representation) bool {
-   switch f.Language {
-   case "", r.GetAdaptationSet().Lang:
-      return true
    }
    return false
 }
